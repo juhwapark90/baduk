@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>어린이 바둑교실: 주제별 마스터</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #e6f0e6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .screen { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; }
+        .screen.active { display: flex; }
+
+        .container {
+            background: #ffffff; padding: 25px; border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1); text-align: center; width: 100%; box-sizing: border-box;
+        }
+
+        h1, h2 { color: #2c5e43; margin-top: 0; margin-bottom: 10px; }
+
+        /* 진행바 UI */
+        .progress-bar-bg {
+            width: 100%; background-color: #e0e0e0; border-radius: 10px; margin-bottom: 15px; height: 15px; overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%; background-color: #4CAF50; width: 0%; transition: width 0.3s;
+        }
+        .progress-text { font-size: 14px; font-weight: bold; color: #555; margin-bottom: 10px; }
+
+        /* 홈 화면 */
+        .title-logo { font-size: 32px; margin-bottom: 10px; }
+        .subtitle { font-size: 14px; color: #777; margin-bottom: 15px; }
+        .topic-list {
+            width: 100%; max-height: 62vh; overflow-y: auto; padding-right: 4px;
+        }
+        .topic-btn {
+            display: block; width: 100%; padding: 13px 14px; margin-bottom: 10px; font-size: 15px; font-weight: bold;
+            color: white; background: linear-gradient(135deg, #ff9800, #fb8c00); border: none; border-radius: 12px; cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.12); transition: 0.15s; text-align: left; box-sizing: border-box;
+        }
+        .topic-btn .emoji { margin-right: 8px; }
+        .topic-btn .desc-line { display: block; font-size: 11px; font-weight: normal; opacity: 0.9; margin-top: 3px; }
+        .topic-btn:hover { transform: translateY(-2px); filter: brightness(1.07); }
+        .topic-btn:active { transform: translateY(0); }
+
+        .home-btn {
+            display: block; width: 100%; padding: 15px; margin-top: 15px; font-size: 16px; font-weight: bold;
+            color: white; background-color: #2c5e43; border: none; border-radius: 10px; cursor: pointer;
+        }
+
+        /* 게임 화면 UI */
+        .topic-title { font-size: 18px; margin-bottom: 4px; }
+        .description-box {
+            background: #f1f8f1; border: 2px solid #c3dec3; padding: 15px; border-radius: 8px;
+            font-size: 15px; line-height: 1.5; text-align: left; margin-bottom: 15px; color: #333; font-weight: bold;
+        }
+
+        /* 바둑판 UI */
+        .board-container {
+            position: relative; width: 360px; height: 360px; background-color: #e5b869;
+            border: 3px solid #6b4c1e; margin: 0 auto 15px; box-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+        }
+        .grid-lines { position: absolute; top: 20px; left: 20px; width: 320px; height: 320px; }
+        .line-h { position: absolute; left: 0; right: 0; height: 1px; background: #333; }
+        .line-v { position: absolute; top: 0; bottom: 0; width: 1px; background: #333; }
+        .layer-intersections { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .intersection {
+            position: absolute; width: 40px; height: 40px; transform: translate(-50%, -50%);
+            cursor: pointer; display: flex; justify-content: center; align-items: center; border-radius: 50%;
+        }
+        .intersection:hover { background-color: rgba(255, 255, 255, 0.4); }
+
+        /* 바둑돌 */
+        .stone { width: 32px; height: 32px; border-radius: 50%; box-shadow: 2px 2px 4px rgba(0,0,0,0.4); pointer-events: none; }
+        .stone.black { background: radial-gradient(circle at 10px 10px, #555, #111); }
+        .stone.white { background: radial-gradient(circle at 10px 10px, #fff, #d4d4d4); border: 1px solid #ccc; box-sizing: border-box; }
+        .stone.preview { box-shadow: 0 0 0 3px #ffeb3b, 2px 2px 4px rgba(0,0,0,0.4); }
+
+        .controls { display: flex; justify-content: center; gap: 10px; margin-top: 5px; }
+        .btn { padding: 12px 24px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; font-weight: bold; color: white; transition: 0.2s; }
+        .btn-check { background-color: #4CAF50; }
+        .btn-check:hover { background-color: #45a049; }
+        .btn-next { background-color: #2196F3; display: none; }
+        .btn-next:hover { background-color: #1e88e5; }
+        .btn-back { background-color: #9e9e9e; margin-top: 12px; padding: 8px 16px; font-size: 13px; }
+
+        .message { font-size: 18px; margin-top: 15px; font-weight: bold; min-height: 27px; color: #d32f2f; }
+        .success-msg { color: #388E3C; }
+
+        /* 결과 화면 */
+        .result-score { font-size: 60px; color: #ff5722; font-weight: bold; margin: 20px 0; }
+        .result-msg { font-size: 22px; color: #333; margin-bottom: 20px; }
+        .result-btns { display: flex; gap: 10px; width: 100%; }
+        .result-btns button { flex: 1; }
+    </style>
+</head>
+<body>
+
+<!-- 메인 홈 화면 -->
+<div id="screen-home" class="screen active">
+    <div class="container">
+        <div class="title-logo">⚫어린이 바둑교실⚪</div>
+        <h2>주제를 골라 도전하세요!</h2>
+        <p class="subtitle">주제를 누르면 매번 새로운 문제 20개가 쉬운 것부터 어려운 순서로 만들어져요.</p>
+        <div class="topic-list" id="topic-list"></div>
+    </div>
+</div>
+
+<!-- 게임 화면 -->
+<div id="screen-game" class="screen">
+    <div class="container">
+        <h2 class="topic-title" id="game-title">문제</h2>
+
+        <div class="progress-text" id="progress-text">문제 1 / 20</div>
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+
+        <div class="description-box" id="problem-desc"></div>
+
+        <div class="board-container">
+            <div class="grid-lines" id="grid-lines"></div>
+            <div class="layer-intersections" id="intersections"></div>
+        </div>
+
+        <div class="controls">
+            <button id="btn-check" class="btn btn-check" onclick="checkAnswer()">정답 확인 ⭕</button>
+            <button id="btn-next" class="btn btn-next" onclick="nextProblem()">다음 문제 ▶</button>
+        </div>
+
+        <div class="message" id="message"></div>
+        <button class="btn btn-back" onclick="goHome()">◀ 주제 목록으로</button>
+    </div>
+</div>
+
+<!-- 결과 화면 -->
+<div id="screen-result" class="screen">
+    <div class="container">
+        <h2>🎉 문제를 모두 풀었어요! 🎉</h2>
+        <div class="result-msg" id="result-topic-msg">20개의 문제를 모두 풀었어요!</div>
+        <div>이번 도전 점수는?</div>
+        <div class="result-score"><span id="final-score">0</span>점</div>
+        <div class="result-btns">
+            <button class="home-btn" onclick="retryTopic()">🔄 이 주제 다시 도전</button>
+            <button class="home-btn" onclick="goHome()">🏠 주제 목록</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const BOARD_SIZE = 9;
+    const CELL_SIZE = 40;
+    const OFFSET = 20;
+
+    let problemsList = [];
+    let currentProblemIndex = 0;
+    let userMarks = [];
+    let isProblemSolved = false;
+    let totalScore = 0;
+    let currentMistakes = 0;
+    let currentTopicKey = null;
+
+    /* =========================================================
+       공통 유틸리티
+    ========================================================= */
+    function inBounds(x, y) { return x >= 0 && x <= 8 && y >= 0 && y <= 8; }
+    function neighbors4(x, y) {
+        return [[x-1,y],[x+1,y],[x,y-1],[x,y+1]].filter(p => inBounds(p[0], p[1]));
+    }
+    function key(x, y) { return x + '_' + y; }
+    function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+    function shuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            let j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    // 연결된 돌 무리를 무작위로 성장시킨다 (occupied 셀은 피해서 자람)
+    function growGroup(occupied, size, startX, startY) {
+        let stones = [[startX, startY]];
+        let stoneSet = new Set([key(startX, startY)]);
+        while (stones.length < size) {
+            let candidates = [];
+            stones.forEach(([sx, sy]) => {
+                neighbors4(sx, sy).forEach(([nx, ny]) => {
+                    let k = key(nx, ny);
+                    if (!stoneSet.has(k) && !occupied.has(k)) candidates.push([nx, ny]);
+                });
+            });
+            if (candidates.length === 0) break;
+            let pick = candidates[Math.floor(Math.random() * candidates.length)];
+            stones.push(pick);
+            stoneSet.add(key(pick[0], pick[1]));
+        }
+        return stones;
+    }
+
+    // 돌 무리의 활로(빈 이웃) 계산
+    function computeLibs(stones, occSet) {
+        let map = {};
+        stones.forEach(([x, y]) => {
+            neighbors4(x, y).forEach(([nx, ny]) => {
+                let k = key(nx, ny);
+                if (!occSet.has(k)) map[k] = [nx, ny];
+            });
+        });
+        return Object.values(map);
+    }
+
+    // 지정된 활로 개수를 갖도록 돌 무리를 만든 후, 남길 활로/막을 활로를 나눠 반환
+    function makeGroupWithLiberties(size, targetLibs, region) {
+        region = region || { minX: 1, maxX: 7, minY: 1, maxY: 7 };
+        for (let a = 0; a < 80; a++) {
+            let sx = randInt(region.minX, region.maxX), sy = randInt(region.minY, region.maxY);
+            let occ = new Set([key(sx, sy)]);
+            let stones = growGroup(occ, size, sx, sy);
+            if (stones.length < size) continue;
+            let occ2 = new Set(stones.map(([x, y]) => key(x, y)));
+            let libs = computeLibs(stones, occ2);
+            if (libs.length < targetLibs) continue;
+            shuffle(libs);
+            let keep = libs.slice(0, targetLibs), block = libs.slice(targetLibs);
+            return { stones, keep, block };
+        }
+        return null;
+    }
+
+    function toObjArr(arr) { return arr.map(([x, y]) => ({ x, y })); }
+
+    /* =========================================================
+       ① 활로찾기
+    ========================================================= */
+    function genLiberty(size) {
+        let sx = randInt(1, 7), sy = randInt(1, 7);
+        let occ = new Set([key(sx, sy)]);
+        let stones = growGroup(occ, size, sx, sy);
+        let occ2 = new Set(stones.map(([x, y]) => key(x, y)));
+        let libs = computeLibs(stones, occ2);
+        return {
+            type: 'mark_multiple',
+            blackStones: toObjArr(stones),
+            whiteStones: [],
+            answers: toObjArr(libs),
+            desc: `표시된 흑돌${size > 1 ? '들' : ''}의 활로(숨구멍)를 모두 찾아 표시하세요!`
+        };
+    }
+
+    /* =========================================================
+       ② 단수의 기술
+    ========================================================= */
+    function genAtari(size) {
+        let r = makeGroupWithLiberties(size, 2);
+        if (!r) return genAtari(1);
+        return {
+            type: 'play_single',
+            blackStones: toObjArr(r.block),
+            whiteStones: toObjArr(r.stones),
+            answers: toObjArr(r.keep),
+            desc: '흰 돌을 단수칠 수 있는 자리를 찾아 흑돌을 놓아보세요! (활로를 1개로 줄이는 자리)'
+        };
+    }
+
+    /* =========================================================
+       ③ 따내기
+    ========================================================= */
+    function genCapture(size) {
+        let r = makeGroupWithLiberties(size, 1);
+        if (!r) return genCapture(1);
+        return {
+            type: 'play_single',
+            blackStones: toObjArr(r.block),
+            whiteStones: toObjArr(r.stones),
+            answers: toObjArr(r.keep),
+            desc: '단수에 몰린 흰 돌을 따낼 수 있는 자리를 찾아 흑돌을 놓아보세요!'
+        };
+    }
+
+    /* =========================================================
+       ⑤ 기본 살리기
+    ========================================================= */
+    function genRescue(size) {
+        let r = makeGroupWithLiberties(size, 1);
+        if (!r) return genRescue(1);
+        return {
+            type: 'play_single',
+            blackStones: toObjArr(r.stones),
+            whiteStones: toObjArr(r.block),
+            answers: toObjArr(r.keep),
+            desc: '앗! 흑돌이 단수에 몰렸어요. 살아남는 자리를 찾아보세요!'
+        };
+    }
+
+    /* =========================================================
+       ④ 돌의 연결과 끊음
+    ========================================================= */
+    function genConnectCut(size, mode) {
+        for (let attempt = 0; attempt < 80; attempt++) {
+            let px = randInt(2, 6), py = randInt(2, 6);
+            let dirs = shuffle([[-1,0],[1,0],[0,-1],[0,1]]);
+            let dirA = dirs[0], dirB = dirs[1];
+            let startA = [px + dirA[0], py + dirA[1]];
+            let startB = [px + dirB[0], py + dirB[1]];
+            if (!inBounds(startA[0], startA[1]) || !inBounds(startB[0], startB[1])) continue;
+            let occ = new Set([key(px, py)]);
+            let groupA = growGroup(occ, size, startA[0], startA[1]);
+            if (groupA.length < size) continue;
+            let occ2 = new Set(groupA.map(([x, y]) => key(x, y)));
+            groupA.forEach(([x, y]) => neighbors4(x, y).forEach(([nx, ny]) => occ2.add(key(nx, ny))));
+            occ2.add(key(px, py));
+            let groupB = growGroup(occ2, size, startB[0], startB[1]);
+            if (groupB.length < size) continue;
+            let stones = toObjArr([...groupA, ...groupB]);
+            let isConnect = mode === 'connect';
+            return {
+                type: 'play_single',
+                blackStones: isConnect ? stones : [],
+                whiteStones: isConnect ? [] : stones,
+                answers: [{ x: px, y: py }],
+                desc: isConnect
+                    ? '두 흑돌 그룹이 끊어지지 않도록 연결하는 자리를 찾아 흑돌을 놓아보세요!'
+                    : '두 흰 돌 그룹을 서로 끊어놓는 자리를 찾아 흑돌을 놓아보세요!'
+            };
+        }
+        return null;
+    }
+
+    /* =========================================================
+       ⑥ 복단수
+    ========================================================= */
+    function genDoubleAtari(sizeA, sizeB) {
+        for (let attempt = 0; attempt < 80; attempt++) {
+            let px = randInt(2, 6), py = randInt(2, 6);
+            let dirs = shuffle([[-1,0],[1,0],[0,-1],[0,1]]);
+            let dirA = dirs[0], dirB = dirs[1];
+            let startA = [px + dirA[0], py + dirA[1]];
+            let startB = [px + dirB[0], py + dirB[1]];
+            if (!inBounds(startA[0], startA[1]) || !inBounds(startB[0], startB[1])) continue;
+            let occA = new Set([key(px, py)]);
+            let groupA = growGroup(occA, sizeA, startA[0], startA[1]);
+            if (groupA.length < sizeA) continue;
+            let bufferA = new Set(groupA.map(([x, y]) => key(x, y)));
+            groupA.forEach(([x, y]) => neighbors4(x, y).forEach(([nx, ny]) => bufferA.add(key(nx, ny))));
+            bufferA.add(key(px, py));
+            let groupB = growGroup(bufferA, sizeB, startB[0], startB[1]);
+            if (groupB.length < sizeB) continue;
+
+            let occA2 = new Set(groupA.map(([x, y]) => key(x, y)));
+            let libsA = computeLibs(groupA, occA2).filter(([x, y]) => !(x === px && y === py));
+            let occB2 = new Set(groupB.map(([x, y]) => key(x, y)));
+            let libsB = computeLibs(groupB, occB2).filter(([x, y]) => !(x === px && y === py));
+            if (libsA.length < 1 || libsB.length < 1) continue;
+            shuffle(libsA); shuffle(libsB);
+            let blockA = libsA.slice(1);
+            let blockB = libsB.slice(1);
+
+            let allWhite = [...groupA, ...groupB];
+            let allBlack = [...blockA, ...blockB];
+            let whiteKeys = new Set(allWhite.map(([x, y]) => key(x, y)));
+            if (allBlack.some(([x, y]) => whiteKeys.has(key(x, y)))) continue;
+
+            return {
+                type: 'play_single',
+                blackStones: toObjArr(allBlack),
+                whiteStones: toObjArr(allWhite),
+                answers: [{ x: px, y: py }],
+                desc: '한 번의 수로 두 개의 흰 돌 무리를 동시에 단수칠 수 있는 자리를 찾아보세요! (복단수)'
+            };
+        }
+        return null;
+    }
+
+    /* =========================================================
+       ⑦ 연단수  /  ⑧ 축 (같은 엔진, 지역만 다르게)
+    ========================================================= */
+    function genAtariChaseCore(size, region, desc) {
+        for (let attempt = 0; attempt < 80; attempt++) {
+            let sx = randInt(region.minX, region.maxX), sy = randInt(region.minY, region.maxY);
+            let occ = new Set([key(sx, sy)]);
+            let stones = growGroup(occ, size, sx, sy);
+            if (stones.length < size) continue;
+            let occ2 = new Set(stones.map(([x, y]) => key(x, y)));
+            let libs = computeLibs(stones, occ2);
+            if (libs.length < 2) continue;
+            shuffle(libs);
+            let keep = libs.slice(0, 2), block = libs.slice(2);
+            let [P1, P2] = keep;
+            let d1 = Math.min(P1[0], 8 - P1[0], P1[1], 8 - P1[1]);
+            let d2 = Math.min(P2[0], 8 - P2[0], P2[1], 8 - P2[1]);
+            let correct = d1 <= d2 ? P1 : P2;
+            let other = d1 <= d2 ? P2 : P1;
+            let usedSet = new Set([
+                ...occ2, ...block.map(([x, y]) => key(x, y)),
+                key(correct[0], correct[1]), key(other[0], other[1])
+            ]);
+            let newN = neighbors4(other[0], other[1]).filter(([nx, ny]) => !usedSet.has(key(nx, ny)));
+            shuffle(newN);
+            let extraBlocks = newN.length >= 1 ? newN.slice(1) : [];
+            let allBlack = [...block, ...extraBlocks];
+            return {
+                type: 'play_single',
+                blackStones: toObjArr(allBlack),
+                whiteStones: toObjArr(stones),
+                answers: [{ x: correct[0], y: correct[1] }],
+                desc
+            };
+        }
+        return null;
+    }
+
+    function genChainAtari(size) {
+        let region = { minX: 2, maxX: 6, minY: 2, maxY: 6 };
+        let r = genAtariChaseCore(size, region,
+            '흰 돌을 단수치면, 도망가도 계속 단수가 이어져서 결국 잡혀요! 그 자리를 찾아보세요! (연단수)');
+        return r || genChainAtari(1);
+    }
+
+    function genLadder(size) {
+        let edges = [
+            { minX: 0, maxX: 1, minY: 1, maxY: 7 },
+            { minX: 7, maxX: 8, minY: 1, maxY: 7 },
+            { minX: 1, maxX: 7, minY: 0, maxY: 1 },
+            { minX: 1, maxX: 7, minY: 7, maxY: 8 }
+        ];
+        let region = edges[randInt(0, 3)];
+        let r = genAtariChaseCore(size, region,
+            '흰 돌을 몰아서 도망갈 수 없게 만드는 단수 자리를 찾아보세요! (축의 원리: 가장자리 쪽으로 몰아야 해요)');
+        return r || genLadder(1);
+    }
+
+    /* =========================================================
+       템플릿 변환 도구 (회전/대칭/평행이동)
+    ========================================================= */
+    function rotPoint(x, y, rot) {
+        switch (rot) {
+            case 90: return [-y, x];
+            case 180: return [-x, -y];
+            case 270: return [y, -x];
+            default: return [x, y];
+        }
+    }
+    function transformCoords(list, rot, mirror) {
+        return list.map(([x, y]) => {
+            let px = mirror ? -x : x;
+            return rotPoint(px, y, rot);
+        });
+    }
+    function placeTemplate(bRel, wRel, aRel, extraRel) {
+        extraRel = extraRel || [];
+        let rot = [0, 90, 180, 270][randInt(0, 3)];
+        let mirror = Math.random() < 0.5;
+        let bT = transformCoords(bRel, rot, mirror);
+        let wT = transformCoords(wRel, rot, mirror);
+        let aT = transformCoords(aRel, rot, mirror);
+        let exT = transformCoords(extraRel, rot, mirror);
+        let all = [...bT, ...wT, ...aT, ...exT];
+        let minX = Math.min(...all.map(p => p[0])), maxX = Math.max(...all.map(p => p[0]));
+        let minY = Math.min(...all.map(p => p[1])), maxY = Math.max(...all.map(p => p[1]));
+        let shiftX = randInt(0, 8 - (maxX - minX)) - minX;
+        let shiftY = randInt(0, 8 - (maxY - minY)) - minY;
+        let toObj = arr => arr.map(([x, y]) => ({ x: x + shiftX, y: y + shiftY }));
+        return { black: toObj(bT), white: toObj(wT), answers: toObj(aT) };
+    }
+
+    // 코너(모서리) 고정 배치 - 진짜 바둑판 가장자리를 활용하는 문제용
+    function cornerAnchor(p, corner) {
+        let [x, y] = p;
+        switch (corner) {
+            case 1: return [8 - y, x];
+            case 2: return [8 - x, 8 - y];
+            case 3: return [y, 8 - x];
+            default: return [x, y];
+        }
+    }
+    function placeCornerTemplate(bRel, aRel, slideMax) {
+        slideMax = slideMax || 0;
+        let slide = slideMax > 0 ? randInt(0, slideMax) : 0;
+        let shiftFn = ([x, y]) => [x + slide, y];
+        let corner = randInt(0, 3);
+        let bAbs = bRel.map(shiftFn).map(p => cornerAnchor(p, corner));
+        let aAbs = aRel.map(shiftFn).map(p => cornerAnchor(p, corner));
+        return { black: toObjArr(bAbs), answers: toObjArr(aAbs) };
+    }
+
+    /* =========================================================
+       ⑨ 장문과 봉쇄
+    ========================================================= */
+    function genNet() {
+        let bRel = [[-1,0],[0,-1],[2,0],[1,-1],[0,2],[-1,1]];
+        let wRel = [[0,0]];
+        let aRel = [[1,1]];
+        let p = placeTemplate(bRel, wRel, aRel);
+        return {
+            type: 'play_single',
+            blackStones: p.black,
+            whiteStones: p.white,
+            answers: p.answers,
+            desc: '흰 돌에 직접 닿지 않으면서도 도망갈 곳을 모두 막는 자리를 찾아보세요! (장문)'
+        };
+    }
+
+    /* =========================================================
+       ⑩ 기초 사활 (두집 만들기 / 옥집 구별)
+    ========================================================= */
+    function genBent3() {
+        let bRel = [[-1,0],[0,-1],[2,0],[1,-1],[1,1],[-1,1],[0,2]];
+        let aRel = [[0,0]];
+        let exRel = [[1,0],[0,1]];
+        let p = placeTemplate(bRel, [], aRel, exRel);
+        return {
+            type: 'play_single',
+            blackStones: p.black, whiteStones: [], answers: p.answers,
+            desc: '구부러진 흑집의 급소를 찾아 두 집을 만들어보세요!'
+        };
+    }
+    function genStraight3() {
+        let bRel = [[-1,0],[3,0],[0,-1],[1,-1],[2,-1],[0,1],[1,1],[2,1]];
+        let aRel = [[1,0]];
+        let exRel = [[0,0],[2,0]];
+        let p = placeTemplate(bRel, [], aRel, exRel);
+        return {
+            type: 'play_single',
+            blackStones: p.black, whiteStones: [], answers: p.answers,
+            desc: '흑집의 급소를 찾아 두 집을 만들어 완전히 살아보세요!'
+        };
+    }
+    function genTrueFalseEye() {
+        let bRel = [
+            [-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1],
+            [3,0],[5,0],[4,-1],[4,1],[5,1]
+        ];
+        let wRel = [[3,-1],[5,-1],[3,1]];
+        let aRel = [[0,0]];
+        let exRel = [[4,0]];
+        let p = placeTemplate(bRel, wRel, aRel, exRel);
+        return {
+            type: 'play_single',
+            blackStones: p.black, whiteStones: p.white, answers: p.answers,
+            desc: '두 흑집 중에서 진짜 눈(살아있는 집)을 찾아 표시해보세요! 가짜 집(옥집)을 조심하세요!'
+        };
+    }
+
+    /* =========================================================
+       ⑪ 고급 전술 (환격, 먹여치기, 끼우기)
+    ========================================================= */
+    function genSnapback() {
+        let wRel = [[0,0],[1,0]];
+        let bRel = [[-1,0],[0,-1],[1,-1],[2,0],[1,1]];
+        let aRel = [[0,1]];
+        let p = placeTemplate(bRel, wRel, aRel);
+        return {
+            type: 'play_single',
+            blackStones: p.black, whiteStones: p.white, answers: p.answers,
+            desc: '흰 돌 2개를 한 번에 잡을 수 있는 자리를 찾아보세요! 이런 모양을 "환격"이라고 해요.'
+        };
+    }
+    function genFeed() {
+        let wRel = [[0,0],[1,0],[1,1]];
+        let bRel = [[-1,0],[0,-1],[2,0],[1,-1],[2,1],[1,2]];
+        let aRel = [[0,1]];
+        let p = placeTemplate(bRel, wRel, aRel);
+        return {
+            type: 'play_single',
+            blackStones: p.black, whiteStones: p.white, answers: p.answers,
+            desc: '흰 돌 3개를 한 번에 잡을 수 있는 자리를 찾아보세요! 상대 안으로 파고드는 "먹여치기" 기술이에요.'
+        };
+    }
+    function genWedge() {
+        let r = genConnectCut(1, 'cut') || genConnectCut(1, 'cut');
+        if (!r) return genSnapback();
+        r.desc = '두 흰 돌 사이에 끼어들어 갈라놓는 자리를 찾아보세요! ("끼우기" 기술이에요)';
+        return r;
+    }
+
+    /* =========================================================
+       ⑫ 실전 사활 (궁도 넓히기/줄이기)
+    ========================================================= */
+    function genLifeCorner() {
+        let bRel = [[2,0],[1,1],[0,2]];
+        let aRel = [[0,0]];
+        let p = placeCornerTemplate(bRel, aRel, 0);
+        return {
+            type: 'play_single',
+            blackStones: p.black, whiteStones: [], answers: p.answers,
+            desc: '구석에 몰린 흑집의 급소를 찾아 두 집을 만들어보세요!'
+        };
+    }
+    function genLifeEdgeStraight3() {
+        let bRel = [[0,0],[4,0],[1,1],[2,1],[3,1]];
+        let aRel = [[2,0]];
+        let p = placeCornerTemplate(bRel, aRel, 4);
+        return {
+            type: 'play_single',
+            blackStones: p.black, whiteStones: [], answers: p.answers,
+            desc: '가장자리에 있는 흑집의 급소를 찾아 두 집을 만들어보세요!'
+        };
+    }
+    function genLifeEdgeT() {
+        let bRel = [[0,0],[4,0],[1,1],[3,1],[2,2]];
+        let aRel = [[2,0]];
+        let p = placeCornerTemplate(bRel, aRel, 4);
+        return {
+            type: 'play_single',
+            blackStones: p.black, whiteStones: [], answers: p.answers,
+            desc: '궁도가 넓은 흑집이에요. 급소를 찾아 안전하게 두 집 이상을 만들어보세요!'
+        };
+    }
+
+    /* =========================================================
+       주제 목록 및 문제 세트 생성
+    ========================================================= */
+    function safeCall(fn) {
+        try {
+            let r = fn();
+            if (r) return r;
+        } catch (e) { console.error(e); }
+        return genLiberty(1);
+    }
+
+    function generateTopicSet(tierFns) {
+        let counts = [7, 7, 6];
+        let result = [];
+        tierFns.forEach((fn, idx) => {
+            for (let i = 0; i < counts[idx]; i++) result.push(safeCall(fn));
+        });
+        return result;
+    }
+
+    const TOPICS = [
+        { key: 'liberty', title: '① 활로찾기', sub: '돌이 살아있는 숨구멍을 모두 찾아요',
+          tiers: [() => genLiberty(1), () => genLiberty(2), () => genLiberty(3)] },
+        { key: 'atari', title: '② 단수의 기술', sub: '상대 돌의 활로를 1개로 줄여요',
+          tiers: [() => genAtari(1), () => genAtari(2), () => genAtari(3)] },
+        { key: 'capture', title: '③ 따내기', sub: '단수된 돌을 완전히 잡아요',
+          tiers: [() => genCapture(1), () => genCapture(2), () => genCapture(3)] },
+        { key: 'connect', title: '④ 돌의 연결과 끊음', sub: '기본 수읽기: 이어야 할 곳, 끊어야 할 곳',
+          tiers: [
+              () => genConnectCut(1, Math.random() < 0.5 ? 'connect' : 'cut'),
+              () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut'),
+              () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut')
+          ] },
+        { key: 'rescue', title: '⑤ 기본 살리기', sub: '단수된 우리 돌을 살려서 도망가요',
+          tiers: [() => genRescue(1), () => genRescue(2), () => genRescue(3)] },
+        { key: 'doubleatari', title: '⑥ 복단수', sub: '한 수로 두 그룹을 동시에 단수쳐요',
+          tiers: [() => genDoubleAtari(1,1), () => genDoubleAtari(1,2), () => genDoubleAtari(2,2)] },
+        { key: 'chainatari', title: '⑦ 연단수', sub: '도망가도 계속 단수가 이어지는 자리',
+          tiers: [() => genChainAtari(1), () => genChainAtari(1), () => genChainAtari(2)] },
+        { key: 'ladder', title: '⑧ 축', sub: '가장자리로 몰아서 완전히 잡아요',
+          tiers: [() => genLadder(1), () => genLadder(1), () => genLadder(2)] },
+        { key: 'basicdeath', title: '⑨ 기초 사활', sub: '두 집 만들기와 옥집(가짜 집) 구별하기',
+          tiers: [() => genBent3(), () => genStraight3(), () => genTrueFalseEye()] },
+        { key: 'net', title: '⑩ 장문과 봉쇄', sub: '직접 닿지 않고 상대를 가둬요',
+          tiers: [() => genNet(), () => genNet(), () => genNet()] },
+        { key: 'advanced', title: '⑪ 고급 전술', sub: '환격 · 먹여치기 · 끼우기',
+          tiers: [() => genSnapback(), () => genFeed(), () => genWedge()] },
+        { key: 'practicaldeath', title: '⑫ 실전 사활', sub: '궁도를 넓혀서 안전하게 살아요',
+          tiers: [() => genLifeCorner(), () => genLifeEdgeStraight3(), () => genLifeEdgeT()] }
+    ];
+
+    /* =========================================================
+       화면/게임 제어 (기존 로직 재사용, 100 -> 가변 개수로 일반화)
+    ========================================================= */
+    function buildHomeScreen() {
+        let list = document.getElementById('topic-list');
+        list.innerHTML = '';
+        TOPICS.forEach(t => {
+            let btn = document.createElement('button');
+            btn.className = 'topic-btn';
+            btn.innerHTML = `${t.title}<span class="desc-line">${t.sub} · 랜덤 20문제</span>`;
+            btn.onclick = () => startTopic(t.key);
+            list.appendChild(btn);
+        });
+    }
+
+    function switchScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    function goHome() { switchScreen('screen-home'); }
+
+    function startTopic(topicKey) {
+        currentTopicKey = topicKey;
+        let topic = TOPICS.find(t => t.key === topicKey);
+        problemsList = generateTopicSet(topic.tiers);
+        currentProblemIndex = 0;
+        totalScore = 0;
+        document.getElementById('game-title').innerText = topic.title;
+        initBoard();
+        switchScreen('screen-game');
+    }
+
+    function retryTopic() { startTopic(currentTopicKey); }
+
+    function initBoard() {
+        const gridLines = document.getElementById('grid-lines');
+        const intersections = document.getElementById('intersections');
+
+        gridLines.innerHTML = ''; intersections.innerHTML = '';
+
+        for (let i = 0; i < BOARD_SIZE; i++) {
+            let hLine = document.createElement('div'); hLine.className = 'line-h'; hLine.style.top = (i * CELL_SIZE) + 'px';
+            gridLines.appendChild(hLine);
+            let vLine = document.createElement('div'); vLine.className = 'line-v'; vLine.style.left = (i * CELL_SIZE) + 'px';
+            gridLines.appendChild(vLine);
+        }
+
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                let inter = document.createElement('div');
+                inter.className = 'intersection';
+                inter.style.left = (OFFSET + x * CELL_SIZE) + 'px'; inter.style.top = (OFFSET + y * CELL_SIZE) + 'px';
+                inter.id = `pos-${x}-${y}`;
+                inter.onclick = () => toggleMark(x, y);
+                intersections.appendChild(inter);
+            }
+        }
+        loadProblem();
+    }
+
+    function loadProblem() {
+        userMarks = []; isProblemSolved = false; currentMistakes = 0;
+        const total = problemsList.length;
+        const currentProblem = problemsList[currentProblemIndex];
+
+        document.getElementById('progress-text').innerText = `문제 ${currentProblemIndex + 1} / ${total}`;
+        document.getElementById('progress-fill').style.width = `${((currentProblemIndex) / total) * 100}%`;
+        document.getElementById('problem-desc').innerText = currentProblem.desc;
+
+        document.getElementById('message').innerText = "";
+        document.getElementById('message').className = "message";
+        document.getElementById('btn-check').style.display = "inline-block";
+        document.getElementById('btn-next').style.display = "none";
+
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                document.getElementById(`pos-${x}-${y}`).innerHTML = "";
+            }
+        }
+
+        currentProblem.blackStones.forEach(pos => {
+            document.getElementById(`pos-${pos.x}-${pos.y}`).innerHTML = `<div class="stone black"></div>`;
+        });
+        currentProblem.whiteStones.forEach(pos => {
+            document.getElementById(`pos-${pos.x}-${pos.y}`).innerHTML = `<div class="stone white"></div>`;
+        });
+    }
+
+    function toggleMark(x, y) {
+        if (isProblemSolved) return;
+        const currentProblem = problemsList[currentProblemIndex];
+
+        if (currentProblem.blackStones.some(s => s.x === x && s.y === y)) return;
+        if (currentProblem.whiteStones.some(s => s.x === x && s.y === y)) return;
+
+        const cell = document.getElementById(`pos-${x}-${y}`);
+        const markIndex = userMarks.findIndex(m => m.x === x && m.y === y);
+
+        if (markIndex > -1) {
+            userMarks.splice(markIndex, 1);
+            cell.innerHTML = "";
+        } else {
+            if (currentProblem.type === "mark_multiple") {
+                userMarks.push({x, y});
+                cell.innerHTML = `<div class="stone white preview"></div>`;
+            } else if (currentProblem.type === "play_single") {
+                if (userMarks.length > 0) {
+                    const prev = userMarks[0];
+                    document.getElementById(`pos-${prev.x}-${prev.y}`).innerHTML = "";
+                    userMarks = [];
+                }
+                userMarks.push({x, y});
+                cell.innerHTML = `<div class="stone black preview"></div>`;
+            }
+        }
+        document.getElementById('message').innerText = "";
+    }
+
+    function checkAnswer() {
+        if (isProblemSolved) return;
+        const currentProblem = problemsList[currentProblemIndex];
+        const answers = currentProblem.answers;
+
+        if (userMarks.length === 0) {
+            showMessage("정답이라고 생각하는 곳에 돌을 놓아보세요!", false); return;
+        }
+
+        let isCorrect = false;
+        if (currentProblem.type === "mark_multiple") {
+            if (userMarks.length !== answers.length) {
+                currentMistakes++; showMessage("숨구멍 갯수가 안맞아요! 다시 세어볼까요?", false); return;
+            }
+            isCorrect = answers.every(ans => userMarks.some(m => m.x === ans.x && m.y === ans.y));
+        } else {
+            const userAns = userMarks[0];
+            isCorrect = answers.some(ans => userAns.x === ans.x && userAns.y === ans.y);
+        }
+
+        if (isCorrect) {
+            isProblemSolved = true;
+            let earnedPoints = Math.max(10 - (currentMistakes * 2), 2);
+            totalScore += earnedPoints;
+
+            showMessage("참 잘했어요! 완벽해요! 🎉", true);
+
+            userMarks.forEach(m => {
+               const st = document.getElementById(`pos-${m.x}-${m.y}`).querySelector('.stone');
+               if(st) st.classList.remove('preview');
+            });
+
+            document.getElementById('btn-check').style.display = "none";
+            document.getElementById('btn-next').style.display = "inline-block";
+        } else {
+            currentMistakes++;
+            showMessage("아쉽네요. 조금만 더 생각해 볼까요?", false);
+        }
+    }
+
+    function showMessage(text, isSuccess) {
+        const msgDiv = document.getElementById('message');
+        msgDiv.innerText = text;
+        msgDiv.className = isSuccess ? "message success-msg" : "message";
+    }
+
+    function nextProblem() {
+        currentProblemIndex++;
+        if (currentProblemIndex >= problemsList.length) {
+            document.getElementById('final-score').innerText = totalScore;
+            let topic = TOPICS.find(t => t.key === currentTopicKey);
+            document.getElementById('result-topic-msg').innerText =
+                `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
+            switchScreen('screen-result');
+        } else {
+            loadProblem();
+        }
+    }
+
+    buildHomeScreen();
+</script>
+
+</body>
+</html>
