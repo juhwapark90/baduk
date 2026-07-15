@@ -362,22 +362,26 @@
     }
     function signOutUser() { auth.signOut(); }
 
-    // 레벨 = 목차의 원기호 번호 순서 그대로. 한 레벨은 100점을 모아야 클리어되고,
-    // 클리어해야만 다음 원기호 레벨이 열린다.
-    const POINTS_PER_LEVEL = 100;
+    // 레벨 = 목차의 원기호 번호 순서 그대로. 각 레벨의 점수는 매번 새로 도전할 때마다
+    // 그 판의 점수(100점 만점)로 갱신되는 "최고 기록"이며, 이전 점수에 더해지지 않는다.
+    // 최고 기록이 CLEAR_THRESHOLD 이상이면 클리어로 인정하고 다음 레벨이 열린다.
+    const SCORE_MAX = 100;
+    const CLEAR_THRESHOLD = 90;
+
+    // 예전 누적 방식으로 저장돼 100점을 넘는 값이 남아있을 수 있으므로 항상 100점 상한으로 읽는다.
+    function topicPoints(record) {
+        return Math.min(SCORE_MAX, (record && record.points) || 0);
+    }
 
     function isTopicUnlocked(idx, character) {
         if (idx === 0) return true;
         const prevRecord = character.topics[TOPICS[idx - 1].key];
-        return !!(prevRecord && (prevRecord.points || 0) >= POINTS_PER_LEVEL);
+        return topicPoints(prevRecord) >= CLEAR_THRESHOLD;
     }
 
     function countClearedTopics(character) {
         if (!character) return 0;
-        return TOPICS.filter(t => {
-            const r = character.topics[t.key];
-            return r && (r.points || 0) >= POINTS_PER_LEVEL;
-        }).length;
+        return TOPICS.filter(t => topicPoints(character.topics[t.key]) >= CLEAR_THRESHOLD).length;
     }
 
     // 캐릭터 전체 레벨 = 클리어한 레벨 수 + 1 (지금 도전 중인 레벨 번호)
@@ -430,26 +434,27 @@
     }
 
     // 저장은 즉시 반영(로컬)하고 Firestore 쓰기는 비동기로 흘려보낸다.
-    // 이번 판으로 그 레벨이 100점을 처음 넘겼는지(=방금 클리어했는지)를 바로 알 수 있도록 동기 반환.
-    function saveTopicResult(topicKey, score, total) {
+    // roundScore/roundMax(원점수, 만점)를 100점 만점으로 환산한 뒤, 그 레벨의 "최고 기록"과 비교해
+    // 더 높을 때만 갱신한다(누적 합산이 아님). 방금 처음으로 클리어 기준을 넘겼는지도 함께 반환.
+    function saveTopicResult(topicKey, roundScore, roundMax) {
         const character = getActiveCharacter();
         if (!currentUser || !character) return null;
-        const prevRecord = character.topics[topicKey] || {};
-        const prevBest = prevRecord.best || 0;
-        const prevTopicPoints = prevRecord.points || 0;
-        const newTopicPoints = prevTopicPoints + score;
+        const prevRecord = character.topics[topicKey];
+        const prevBest = topicPoints(prevRecord);
+        const scaledScore = Math.min(SCORE_MAX, Math.round((roundScore / roundMax) * SCORE_MAX));
+        const newBest = Math.max(prevBest, scaledScore);
         character.topics[topicKey] = {
-            best: Math.max(prevBest, score),
-            total: total,
-            cleared: newTopicPoints >= POINTS_PER_LEVEL,
-            points: newTopicPoints,
+            total: SCORE_MAX,
+            cleared: newBest >= CLEAR_THRESHOLD,
+            points: newBest,
             lastPlayed: Date.now()
         };
-        character.totalEarned = (character.totalEarned || 0) + score;
-        character.wallet = (character.wallet || 0) + score;
+        // 상점 화폐(지갑)와 캐릭터 전체 누적 통계는 매 판 얻은 원점수를 계속 쌓는다 (레벨 클리어 기준과는 별개).
+        character.totalEarned = (character.totalEarned || 0) + roundScore;
+        character.wallet = (character.wallet || 0) + roundScore;
         saveProfile();
-        const justCleared = prevTopicPoints < POINTS_PER_LEVEL && newTopicPoints >= POINTS_PER_LEVEL;
-        return { justCleared, newCharacterLevel: characterLevel(character) };
+        const justCleared = prevBest < CLEAR_THRESHOLD && newBest >= CLEAR_THRESHOLD;
+        return { justCleared, newCharacterLevel: characterLevel(character), scaledScore };
     }
 
     function renderAuthBar() {
@@ -1378,8 +1383,8 @@
         TOPICS.forEach((t, idx) => {
             let btn = document.createElement('button');
             let record = hasCharacter && character.topics[t.key];
-            let points = (record && record.points) || 0;
-            let isCleared = points >= POINTS_PER_LEVEL;
+            let points = topicPoints(record);
+            let isCleared = points >= CLEAR_THRESHOLD;
             let unlocked = hasCharacter && isTopicUnlocked(idx, character);
             let locked = !hasCharacter || !unlocked;
             btn.className = 'topic-btn' + (locked ? ' locked' : '');
@@ -1392,11 +1397,10 @@
             } else if (!unlocked) {
                 progressLine = `<span class="topic-progress-text">이전 레벨을 클리어하면 열려요</span>`;
             } else {
-                let shown = Math.min(points, POINTS_PER_LEVEL);
-                let remain = isCleared ? '' : ` (클리어까지 ${POINTS_PER_LEVEL - shown}점)`;
+                let remain = isCleared ? '' : ` (클리어까지 ${CLEAR_THRESHOLD - points}점)`;
                 progressLine = `
-                    <div class="topic-progress-bg"><div class="topic-progress-fill" style="width:${shown}%"></div></div>
-                    <span class="topic-progress-text">${shown}/${POINTS_PER_LEVEL}${remain}</span>`;
+                    <div class="topic-progress-bg"><div class="topic-progress-fill" style="width:${points}%"></div></div>
+                    <span class="topic-progress-text">${points}/${SCORE_MAX}점 (최고 기록)${remain}</span>`;
             }
 
             btn.innerHTML = `
@@ -1600,13 +1604,15 @@
     function nextProblem() {
         currentProblemIndex++;
         if (currentProblemIndex >= problemsList.length) {
-            document.getElementById('final-score').innerText = totalScore;
+            const roundMax = problemsList.length * 10;
+            const scaledScore = Math.min(SCORE_MAX, Math.round((totalScore / roundMax) * SCORE_MAX));
+            document.getElementById('final-score').innerText = scaledScore;
             let topic = TOPICS.find(t => t.key === currentTopicKey);
             document.getElementById('result-topic-msg').innerText =
                 `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
             const saveMsgEl = document.getElementById('result-save-msg');
             if (currentUser && getActiveCharacter()) {
-                const result = saveTopicResult(currentTopicKey, totalScore, problemsList.length * 10);
+                const result = saveTopicResult(currentTopicKey, totalScore, roundMax);
                 renderCharacterHeader();
                 saveMsgEl.innerText = (result && result.justCleared)
                     ? `기록이 저장됐어요! 🙌  🎉 레벨 클리어! 다음 레벨이 열렸어요! (Lv.${result.newCharacterLevel})`
