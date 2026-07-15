@@ -71,10 +71,16 @@
         .topic-btn .desc-line { display: block; font-size: 11px; font-weight: normal; opacity: 0.9; margin-top: 3px; }
         .topic-btn:hover { transform: translateY(-2px); filter: brightness(1.07); }
         .topic-btn:active { transform: translateY(0); }
-        .topic-btn .badge {
-            display: inline-block; margin-top: 4px; font-size: 11px; font-weight: bold;
-            background: rgba(255,255,255,0.25); padding: 2px 8px; border-radius: 10px;
+        .topic-top-row { display: flex; justify-content: space-between; align-items: center; }
+        .level-badge {
+            display: inline-block; font-size: 11px; font-weight: bold; white-space: nowrap; margin-left: 6px;
+            background: rgba(255,255,255,0.28); padding: 2px 8px; border-radius: 10px;
         }
+        .topic-progress-bg {
+            width: 100%; background: rgba(255,255,255,0.35); border-radius: 8px; height: 8px; margin-top: 6px; overflow: hidden;
+        }
+        .topic-progress-fill { height: 100%; background: #fff; border-radius: 8px; transition: width 0.3s; }
+        .topic-progress-text { display: block; font-size: 10px; font-weight: normal; opacity: 0.9; margin-top: 3px; }
 
         /* 로그인 바 */
         .auth-bar { width: 100%; margin-bottom: 14px; }
@@ -134,6 +140,12 @@
         .btn-next:hover { background-color: #1e88e5; }
         .btn-back { background-color: #9e9e9e; margin-top: 12px; padding: 8px 16px; font-size: 13px; }
 
+        .side-btn {
+            flex: 1; padding: 14px; font-size: 16px; font-weight: bold; cursor: pointer;
+            border: 3px solid #ddd; border-radius: 10px; background: white; color: #333; transition: 0.15s;
+        }
+        .side-btn.selected { border-color: #2196F3; background: #e3f2fd; }
+
         .message { font-size: 18px; margin-top: 15px; font-weight: bold; min-height: 27px; color: #d32f2f; }
         .success-msg { color: #388E3C; }
 
@@ -172,6 +184,11 @@
         <div class="board-container">
             <div class="grid-lines" id="grid-lines"></div>
             <div class="layer-intersections" id="intersections"></div>
+        </div>
+
+        <div class="controls" id="choose-side-controls" style="display:none;">
+            <button class="side-btn" id="side-btn-black" onclick="chooseSide('black')">⚫ 흑 승리</button>
+            <button class="side-btn" id="side-btn-white" onclick="chooseSide('white')">⚪ 백 승리</button>
         </div>
 
         <div class="controls">
@@ -249,21 +266,29 @@
         }
     }
 
-    async function saveUserProgress(topicKey, score, total) {
-        if (!currentUser) return;
-        const prevBest = (userProgress[topicKey] && userProgress[topicKey].best) || 0;
+    const POINTS_PER_LEVEL = 100;
+    function levelFromPoints(points) {
+        return Math.floor((points || 0) / POINTS_PER_LEVEL) + 1;
+    }
+
+    // 저장은 즉시 반영(로컬)하고 Firestore 쓰기는 비동기로 흘려보낸다. 레벨업 여부를 바로 알 수 있도록 동기 반환.
+    function saveUserProgress(topicKey, score, total) {
+        if (!currentUser) return null;
+        const prevRecord = userProgress[topicKey] || {};
+        const prevBest = prevRecord.best || 0;
+        const prevPoints = prevRecord.points || 0;
+        const newPoints = prevPoints + score;
         const entry = {
             best: Math.max(prevBest, score),
             total: total,
             cleared: true,
+            points: newPoints,
             lastPlayed: Date.now()
         };
         userProgress[topicKey] = entry;
-        try {
-            await db.collection('progress').doc(currentUser.uid).set({ [topicKey]: entry }, { merge: true });
-        } catch (e) {
-            console.error(e);
-        }
+        db.collection('progress').doc(currentUser.uid).set({ [topicKey]: entry }, { merge: true })
+            .catch(e => console.error(e));
+        return { prevLevel: levelFromPoints(prevPoints), newLevel: levelFromPoints(newPoints) };
     }
 
     function renderAuthBar() {
@@ -753,6 +778,71 @@
     }
 
     /* =========================================================
+       ⓪ 승부 결정하기 (집 세기 / 승자 맞히기)
+    ========================================================= */
+    // 바둑판을 왼쪽/오른쪽(또는 위/아래) 두 영역으로 나누는 경계선을 무작위로 그려서
+    // 각 영역을 한쪽 돌의 집(영토)으로 만든다. 각 줄마다 경계 돌을 1개씩 두므로
+    // 경계선이 어떤 모양이어도 두 영역은 항상 완전히 분리된다 (다른 색 집이 섞이지 않음).
+    function genTerritoryProblem(difficulty) {
+        let fallback = null;
+        for (let attempt = 0; attempt < 300; attempt++) {
+            let vertical = Math.random() < 0.5;
+            let c = randInt(3, 5);
+            let path = [];
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                c += randInt(-1, 1);
+                c = Math.max(1, Math.min(7, c));
+                path.push(c);
+            }
+
+            let sideAStones = [], sideBStones = [];
+            let sideATerritory = 0, sideBTerritory = 0;
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                let ac = path[row], bc = path[row] + 1;
+                let posA = vertical ? { x: ac, y: row } : { x: row, y: ac };
+                let posB = vertical ? { x: bc, y: row } : { x: row, y: bc };
+                sideAStones.push(posA);
+                sideBStones.push(posB);
+                sideATerritory += ac;
+                sideBTerritory += (8 - bc);
+            }
+
+            let scoreA = sideAStones.length + sideATerritory;
+            let scoreB = sideBStones.length + sideBTerritory;
+            let diff = Math.abs(scoreA - scoreB);
+
+            let inRange = difficulty === 'easy' ? diff >= 8 :
+                difficulty === 'medium' ? (diff >= 3 && diff <= 9) :
+                (diff >= 1 && diff <= 4);
+
+            if (diff > 0) fallback = { sideAStones, sideBStones, scoreA, scoreB };
+            if (inRange) { fallback = { sideAStones, sideBStones, scoreA, scoreB }; break; }
+        }
+        let best = fallback;
+        if (!best) return null;
+
+        let blackIsA = Math.random() < 0.5;
+        let blackStones = blackIsA ? best.sideAStones : best.sideBStones;
+        let whiteStones = blackIsA ? best.sideBStones : best.sideAStones;
+        let blackScore = blackIsA ? best.scoreA : best.scoreB;
+        let whiteScore = blackIsA ? best.scoreB : best.scoreA;
+        let winner = blackScore > whiteScore ? 'black' : 'white';
+
+        let desc = difficulty === 'easy'
+            ? '바둑이 끝났어요! 누가 이겼을까요? 집이 훨씬 많은 쪽의 돌을 골라보세요!'
+            : difficulty === 'medium'
+            ? '바둑이 끝났어요! 양쪽의 집을 잘 세어보고, 이긴 쪽의 돌을 골라보세요!'
+            : '바둑이 끝났어요! 아주 팽팽한 승부예요. 집을 꼼꼼히 세어보고 이긴 쪽을 골라보세요!';
+
+        return {
+            type: 'choose_side',
+            blackStones, whiteStones,
+            blackScore, whiteScore, winner,
+            desc
+        };
+    }
+
+    /* =========================================================
        주제 목록 및 문제 세트 생성
     ========================================================= */
     function safeCall(fn) {
@@ -773,33 +863,35 @@
     }
 
     const TOPICS = [
-        { key: 'liberty', title: '① 활로찾기', sub: '돌이 살아있는 숨구멍을 모두 찾아요',
+        { key: 'territory', title: '① 승부 결정하기', sub: '집이 더 많은 쪽, 이긴 돌을 맞혀요',
+          tiers: [() => genTerritoryProblem('easy'), () => genTerritoryProblem('medium'), () => genTerritoryProblem('hard')] },
+        { key: 'liberty', title: '② 활로찾기', sub: '돌이 살아있는 숨구멍을 모두 찾아요',
           tiers: [() => genLiberty(1), () => genLiberty(2), () => genLiberty(3)] },
-        { key: 'atari', title: '② 단수의 기술', sub: '상대 돌의 활로를 1개로 줄여요',
+        { key: 'atari', title: '③ 단수의 기술', sub: '상대 돌의 활로를 1개로 줄여요',
           tiers: [() => genAtari(1), () => genAtari(2), () => genAtari(3)] },
-        { key: 'capture', title: '③ 따내기', sub: '단수된 돌을 완전히 잡아요',
+        { key: 'capture', title: '④ 따내기', sub: '단수된 돌을 완전히 잡아요',
           tiers: [() => genCapture(1), () => genCapture(2), () => genCapture(3)] },
-        { key: 'connect', title: '④ 돌의 연결과 끊음', sub: '기본 수읽기: 이어야 할 곳, 끊어야 할 곳',
+        { key: 'connect', title: '⑤ 돌의 연결과 끊음', sub: '기본 수읽기: 이어야 할 곳, 끊어야 할 곳',
           tiers: [
               () => genConnectCut(1, Math.random() < 0.5 ? 'connect' : 'cut'),
               () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut'),
               () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut')
           ] },
-        { key: 'rescue', title: '⑤ 기본 살리기', sub: '단수된 우리 돌을 살려서 도망가요',
+        { key: 'rescue', title: '⑥ 기본 살리기', sub: '단수된 우리 돌을 살려서 도망가요',
           tiers: [() => genRescue(1), () => genRescue(2), () => genRescue(3)] },
-        { key: 'doubleatari', title: '⑥ 복단수', sub: '한 수로 두 그룹을 동시에 단수쳐요',
+        { key: 'doubleatari', title: '⑦ 복단수', sub: '한 수로 두 그룹을 동시에 단수쳐요',
           tiers: [() => genDoubleAtari(1,1), () => genDoubleAtari(1,2), () => genDoubleAtari(2,2)] },
-        { key: 'chainatari', title: '⑦ 연단수', sub: '도망가도 계속 단수가 이어지는 자리',
+        { key: 'chainatari', title: '⑧ 연단수', sub: '도망가도 계속 단수가 이어지는 자리',
           tiers: [() => genChainAtari(1), () => genChainAtari(1), () => genChainAtari(2)] },
-        { key: 'ladder', title: '⑧ 축', sub: '가장자리로 몰아서 완전히 잡아요',
+        { key: 'ladder', title: '⑨ 축', sub: '가장자리로 몰아서 완전히 잡아요',
           tiers: [() => genLadder(1), () => genLadder(1), () => genLadder(2)] },
-        { key: 'basicdeath', title: '⑨ 기초 사활', sub: '두 집 만들기와 옥집(가짜 집) 구별하기',
+        { key: 'basicdeath', title: '⑩ 기초 사활', sub: '두 집 만들기와 옥집(가짜 집) 구별하기',
           tiers: [() => genBent3(), () => genStraight3(), () => genTrueFalseEye()] },
-        { key: 'net', title: '⑩ 장문과 봉쇄', sub: '직접 닿지 않고 상대를 가둬요',
+        { key: 'net', title: '⑪ 장문과 봉쇄', sub: '직접 닿지 않고 상대를 가둬요',
           tiers: [() => genNet(), () => genNet(), () => genNet()] },
-        { key: 'advanced', title: '⑪ 고급 전술', sub: '환격 · 먹여치기 · 끼우기',
+        { key: 'advanced', title: '⑫ 고급 전술', sub: '환격 · 먹여치기 · 끼우기',
           tiers: [() => genSnapback(), () => genFeed(), () => genWedge()] },
-        { key: 'practicaldeath', title: '⑫ 실전 사활', sub: '궁도를 넓혀서 안전하게 살아요',
+        { key: 'practicaldeath', title: '⑬ 실전 사활', sub: '궁도를 넓혀서 안전하게 살아요',
           tiers: [() => genLifeCorner(), () => genLifeEdgeStraight3(), () => genLifeEdgeT()] }
     ];
 
@@ -813,8 +905,19 @@
             let btn = document.createElement('button');
             btn.className = 'topic-btn';
             let record = userProgress[t.key];
-            let badge = record ? `<span class="badge">✅ 최고 ${record.best}점</span>` : '';
-            btn.innerHTML = `${t.title}<span class="desc-line">${t.sub} · 랜덤 20문제 ${badge}</span>`;
+            let points = (record && record.points) || 0;
+            let level = levelFromPoints(points);
+            let progressInLevel = points % POINTS_PER_LEVEL;
+            let clearedMark = record && record.cleared ? ' ✅' : '';
+            btn.innerHTML = `
+                <div class="topic-top-row">
+                    <span>${t.title}</span>
+                    <span class="level-badge">Lv.${level}${clearedMark}</span>
+                </div>
+                <span class="desc-line">${t.sub} · 랜덤 20문제</span>
+                <div class="topic-progress-bg"><div class="topic-progress-fill" style="width:${progressInLevel}%"></div></div>
+                <span class="topic-progress-text">${progressInLevel}/${POINTS_PER_LEVEL} (다음 레벨까지 ${POINTS_PER_LEVEL - progressInLevel}점)</span>
+            `;
             btn.onclick = () => startTopic(t.key);
             list.appendChild(btn);
         });
@@ -880,6 +983,11 @@
         document.getElementById('btn-check').style.display = "inline-block";
         document.getElementById('btn-next').style.display = "none";
 
+        const isChooseSide = currentProblem.type === 'choose_side';
+        document.getElementById('choose-side-controls').style.display = isChooseSide ? 'flex' : 'none';
+        document.getElementById('side-btn-black').classList.remove('selected');
+        document.getElementById('side-btn-white').classList.remove('selected');
+
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
                 document.getElementById(`pos-${x}-${y}`).innerHTML = "";
@@ -894,9 +1002,18 @@
         });
     }
 
+    function chooseSide(color) {
+        if (isProblemSolved) return;
+        userMarks = [{ choice: color }];
+        document.getElementById('side-btn-black').classList.toggle('selected', color === 'black');
+        document.getElementById('side-btn-white').classList.toggle('selected', color === 'white');
+        document.getElementById('message').innerText = "";
+    }
+
     function toggleMark(x, y) {
         if (isProblemSolved) return;
         const currentProblem = problemsList[currentProblemIndex];
+        if (currentProblem.type === 'choose_side') return;
 
         if (currentProblem.blackStones.some(s => s.x === x && s.y === y)) return;
         if (currentProblem.whiteStones.some(s => s.x === x && s.y === y)) return;
@@ -930,11 +1047,16 @@
         const answers = currentProblem.answers;
 
         if (userMarks.length === 0) {
-            showMessage("정답이라고 생각하는 곳에 돌을 놓아보세요!", false); return;
+            const emptyMsg = currentProblem.type === 'choose_side'
+                ? "흑과 백 중 이겼다고 생각하는 쪽을 골라보세요!"
+                : "정답이라고 생각하는 곳에 돌을 놓아보세요!";
+            showMessage(emptyMsg, false); return;
         }
 
         let isCorrect = false;
-        if (currentProblem.type === "mark_multiple") {
+        if (currentProblem.type === "choose_side") {
+            isCorrect = userMarks[0].choice === currentProblem.winner;
+        } else if (currentProblem.type === "mark_multiple") {
             if (userMarks.length !== answers.length) {
                 currentMistakes++; showMessage("숨구멍 갯수가 안맞아요! 다시 세어볼까요?", false); return;
             }
@@ -949,18 +1071,25 @@
             let earnedPoints = Math.max(10 - (currentMistakes * 2), 2);
             totalScore += earnedPoints;
 
-            showMessage("참 잘했어요! 완벽해요! 🎉", true);
-
-            userMarks.forEach(m => {
-               const st = document.getElementById(`pos-${m.x}-${m.y}`).querySelector('.stone');
-               if(st) st.classList.remove('preview');
-            });
+            if (currentProblem.type === "choose_side") {
+                const winnerLabel = currentProblem.winner === 'black' ? '⚫ 흑' : '⚪ 백';
+                showMessage(`정답이에요! ${winnerLabel} 승리! (흑 ${currentProblem.blackScore}집 · 백 ${currentProblem.whiteScore}집) 🎉`, true);
+            } else {
+                showMessage("참 잘했어요! 완벽해요! 🎉", true);
+                userMarks.forEach(m => {
+                   const st = document.getElementById(`pos-${m.x}-${m.y}`).querySelector('.stone');
+                   if(st) st.classList.remove('preview');
+                });
+            }
 
             document.getElementById('btn-check').style.display = "none";
             document.getElementById('btn-next').style.display = "inline-block";
         } else {
             currentMistakes++;
-            showMessage("아쉽네요. 조금만 더 생각해 볼까요?", false);
+            const wrongMsg = currentProblem.type === 'choose_side'
+                ? "다시 세어볼까요? 집을 꼼꼼히 세어보세요!"
+                : "아쉽네요. 조금만 더 생각해 볼까요?";
+            showMessage(wrongMsg, false);
         }
     }
 
@@ -979,8 +1108,10 @@
                 `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
             const saveMsgEl = document.getElementById('result-save-msg');
             if (currentUser) {
-                saveUserProgress(currentTopicKey, totalScore, problemsList.length * 10);
-                saveMsgEl.innerText = '기록이 저장됐어요! 🙌';
+                const levelResult = saveUserProgress(currentTopicKey, totalScore, problemsList.length * 10);
+                saveMsgEl.innerText = (levelResult && levelResult.newLevel > levelResult.prevLevel)
+                    ? `기록이 저장됐어요! 🙌  🎉 레벨업! Lv.${levelResult.newLevel} 달성!`
+                    : '기록이 저장됐어요! 🙌';
             } else {
                 saveMsgEl.innerText = '로그인하면 기록이 저장돼요. (홈 화면에서 로그인해보세요!)';
             }
