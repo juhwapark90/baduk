@@ -81,6 +81,73 @@
         }
         .topic-progress-fill { height: 100%; background: #fff; border-radius: 8px; transition: width 0.3s; }
         .topic-progress-text { display: block; font-size: 10px; font-weight: normal; opacity: 0.9; margin-top: 3px; }
+        .topic-btn.locked { filter: grayscale(0.6); opacity: 0.6; }
+
+        /* 캐릭터 헤더 (메인화면 상단 고정) */
+        .character-header {
+            display: none; align-items: center; gap: 10px; width: 100%;
+            background: linear-gradient(135deg, #2c5e43, #3f7d5c); color: white;
+            border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; box-sizing: border-box;
+        }
+        .ch-info { flex: 1; text-align: left; }
+        .ch-name-row { font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+        .ch-points-row { font-size: 12px; opacity: 0.9; margin-top: 2px; }
+        .ch-icon-btn {
+            background: rgba(255,255,255,0.2); border: none; border-radius: 8px; color: white;
+            font-size: 16px; padding: 6px 9px; cursor: pointer;
+        }
+        .ch-icon-btn:hover { background: rgba(255,255,255,0.35); }
+
+        /* 아바타 (이모지 + 액세서리 겹치기) */
+        .avatar-display { position: relative; display: inline-block; line-height: 1; }
+        .avatar-display .acc-hat { position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%) scale(0.55); }
+        .avatar-display .acc-glasses { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%) scale(0.5); }
+        .avatar-display .acc-extra { position: absolute; bottom: -0.15em; right: -0.15em; transform: scale(0.5); }
+
+        /* 캐릭터 선택 화면 */
+        .character-select-list { display: flex; gap: 12px; width: 100%; margin: 14px 0; flex-wrap: wrap; justify-content: center; }
+        .character-card {
+            flex: 1; min-width: 120px; background: #f1f8f1; border: 2px solid #c3dec3; border-radius: 14px;
+            padding: 14px 10px; cursor: pointer; text-align: center; font-size: 40px;
+        }
+        .character-card:hover { background: #e3f2e3; }
+        .cc-name { font-size: 14px; font-weight: bold; color: #2c5e43; margin-top: 6px; }
+        .cc-level { font-size: 11px; color: #666; margin-top: 2px; }
+
+        /* 캐릭터 생성 화면 */
+        .cc-input {
+            width: 100%; padding: 10px; font-size: 14px; border: 2px solid #ddd; border-radius: 8px;
+            margin-bottom: 10px; box-sizing: border-box;
+        }
+        .cc-gender-row { display: flex; gap: 8px; width: 100%; margin-bottom: 14px; }
+        .gender-btn {
+            flex: 1; padding: 10px 4px; font-size: 13px; border: 2px solid #ddd; border-radius: 8px;
+            background: white; cursor: pointer;
+        }
+        .gender-btn.selected { border-color: #ff9800; background: #fff3e0; font-weight: bold; }
+        .avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; margin-bottom: 16px; }
+        .avatar-option-btn {
+            font-size: 28px; padding: 10px 0; border: 2px solid #ddd; border-radius: 10px; background: white; cursor: pointer;
+        }
+        .avatar-option-btn.selected { border-color: #2196F3; background: #e3f2fd; }
+
+        /* 상점 화면 */
+        .shop-preview { font-size: 64px; margin: 10px 0; }
+        .shop-wallet-row { font-size: 16px; font-weight: bold; color: #ff9800; margin-bottom: 14px; }
+        .shop-slot-section { margin-bottom: 16px; text-align: left; }
+        .shop-slot-title { font-size: 14px; color: #2c5e43; margin: 0 0 8px; }
+        .shop-item-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .shop-item-card {
+            background: #f7f7f7; border: 2px solid #e0e0e0; border-radius: 10px; padding: 10px; text-align: center;
+        }
+        .shop-item-emoji { font-size: 30px; }
+        .shop-item-name { font-size: 12px; font-weight: bold; margin: 4px 0; color: #333; }
+        .shop-item-btn {
+            width: 100%; padding: 6px; font-size: 11px; font-weight: bold; border: none; border-radius: 6px;
+            background: #4CAF50; color: white; cursor: pointer;
+        }
+        .shop-item-btn:disabled { background: #bbb; cursor: not-allowed; }
+        .shop-item-btn.equipped { background: #2196F3; }
 
         /* 로그인 바 */
         .auth-bar { width: 100%; margin-bottom: 14px; }
@@ -161,11 +228,51 @@
 <!-- 메인 홈 화면 -->
 <div id="screen-home" class="screen active">
     <div class="container">
+        <div class="character-header" id="character-header"></div>
         <div class="title-logo">⚫어린이 바둑교실⚪</div>
         <h2>주제를 골라 도전하세요!</h2>
         <p class="subtitle">주제를 누르면 매번 새로운 문제 20개가 쉬운 것부터 어려운 순서로 만들어져요.</p>
         <div class="auth-bar" id="auth-bar"></div>
         <div class="topic-list" id="topic-list"></div>
+    </div>
+</div>
+
+<!-- 캐릭터 선택 화면 -->
+<div id="screen-character-select" class="screen">
+    <div class="container">
+        <h2>캐릭터를 선택하세요</h2>
+        <div class="character-select-list" id="character-select-list"></div>
+        <button class="home-btn" id="character-add-btn"
+            onclick="renderCharacterCreateScreen(); switchScreen('screen-character-create');">➕ 새 캐릭터 만들기</button>
+        <button class="btn btn-back" onclick="switchScreen('screen-home')" style="margin-top:10px;">◀ 홈으로</button>
+    </div>
+</div>
+
+<!-- 캐릭터 생성 화면 -->
+<div id="screen-character-create" class="screen">
+    <div class="container">
+        <h2>나만의 캐릭터 만들기</h2>
+        <input type="text" id="cc-name-input" class="cc-input" placeholder="이름을 입력하세요" maxlength="10">
+        <input type="number" id="cc-age-input" class="cc-input" placeholder="나이 (선택 입력)" min="1" max="19">
+        <div class="cc-gender-row">
+            <button class="gender-btn" onclick="selectGender('boy', this)">👦 남자아이</button>
+            <button class="gender-btn" onclick="selectGender('girl', this)">👧 여자아이</button>
+            <button class="gender-btn" onclick="selectGender('none', this)">🙂 비공개</button>
+        </div>
+        <div class="avatar-grid" id="avatar-grid"></div>
+        <button class="home-btn" onclick="createCharacter()">✨ 캐릭터 만들기</button>
+        <button class="btn btn-back" onclick="renderCharacterSelect(); switchScreen('screen-character-select');">◀ 뒤로</button>
+    </div>
+</div>
+
+<!-- 캐릭터 상점 화면 -->
+<div id="screen-shop" class="screen">
+    <div class="container">
+        <h2>🛍️ 캐릭터 상점</h2>
+        <div id="shop-preview" class="shop-preview"></div>
+        <div class="shop-wallet-row">💰 <span id="shop-wallet">0P</span></div>
+        <div id="shop-item-list"></div>
+        <button class="btn btn-back" onclick="switchScreen('screen-home')">◀ 홈으로</button>
     </div>
 </div>
 
@@ -237,7 +344,7 @@
     const db = firebase.firestore();
 
     let currentUser = null;
-    let userProgress = {};
+    let profile = { characters: [], activeCharacterId: null };
 
     function signInGoogle() {
         const provider = new firebase.auth.GoogleAuthProvider();
@@ -255,40 +362,73 @@
     }
     function signOutUser() { auth.signOut(); }
 
-    async function loadUserProgress() {
-        if (!currentUser) { userProgress = {}; return; }
-        try {
-            const doc = await db.collection('progress').doc(currentUser.uid).get();
-            userProgress = doc.exists ? doc.data() : {};
-        } catch (e) {
-            console.error(e);
-            userProgress = {};
-        }
-    }
-
     const POINTS_PER_LEVEL = 100;
     function levelFromPoints(points) {
         return Math.floor((points || 0) / POINTS_PER_LEVEL) + 1;
     }
 
+    // 이 기능 이전에 저장된 예전 형식(uid 문서 바로 아래에 주제별 기록)을 캐릭터 1명으로 이전한다.
+    function migrateLegacyProgress(data) {
+        if (data.characters) return data;
+        const topicKeys = new Set(TOPICS.map(t => t.key));
+        const legacyTopics = {};
+        let totalEarned = 0;
+        Object.keys(data).forEach(k => {
+            if (topicKeys.has(k) && data[k] && typeof data[k] === 'object') {
+                legacyTopics[k] = data[k];
+                totalEarned += data[k].points || 0;
+            }
+        });
+        if (Object.keys(legacyTopics).length === 0) {
+            return { characters: [], activeCharacterId: null };
+        }
+        const character = {
+            id: 'char_legacy', name: '바둑이', age: null, gender: 'none', avatar: '🧑',
+            equipped: { hat: null, glasses: null, extra: null }, owned: [],
+            wallet: totalEarned, totalEarned: totalEarned, topics: legacyTopics
+        };
+        return { characters: [character], activeCharacterId: character.id };
+    }
+
+    async function loadProfile() {
+        if (!currentUser) { profile = { characters: [], activeCharacterId: null }; return; }
+        try {
+            const doc = await db.collection('progress').doc(currentUser.uid).get();
+            profile = migrateLegacyProgress(doc.exists ? doc.data() : {});
+        } catch (e) {
+            console.error(e);
+            profile = { characters: [], activeCharacterId: null };
+        }
+    }
+
+    function saveProfile() {
+        if (!currentUser) return;
+        db.collection('progress').doc(currentUser.uid).set(profile).catch(e => console.error(e));
+    }
+
+    function getActiveCharacter() {
+        return profile.characters.find(c => c.id === profile.activeCharacterId) || null;
+    }
+
     // 저장은 즉시 반영(로컬)하고 Firestore 쓰기는 비동기로 흘려보낸다. 레벨업 여부를 바로 알 수 있도록 동기 반환.
-    function saveUserProgress(topicKey, score, total) {
-        if (!currentUser) return null;
-        const prevRecord = userProgress[topicKey] || {};
+    function saveTopicResult(topicKey, score, total) {
+        const character = getActiveCharacter();
+        if (!currentUser || !character) return null;
+        const prevRecord = character.topics[topicKey] || {};
         const prevBest = prevRecord.best || 0;
-        const prevPoints = prevRecord.points || 0;
-        const newPoints = prevPoints + score;
-        const entry = {
+        const prevTopicPoints = prevRecord.points || 0;
+        character.topics[topicKey] = {
             best: Math.max(prevBest, score),
             total: total,
             cleared: true,
-            points: newPoints,
+            points: prevTopicPoints + score,
             lastPlayed: Date.now()
         };
-        userProgress[topicKey] = entry;
-        db.collection('progress').doc(currentUser.uid).set({ [topicKey]: entry }, { merge: true })
-            .catch(e => console.error(e));
-        return { prevLevel: levelFromPoints(prevPoints), newLevel: levelFromPoints(newPoints) };
+        const prevTotalEarned = character.totalEarned || 0;
+        character.totalEarned = prevTotalEarned + score;
+        character.wallet = (character.wallet || 0) + score;
+        saveProfile();
+        return { prevLevel: levelFromPoints(prevTotalEarned), newLevel: levelFromPoints(character.totalEarned) };
     }
 
     function renderAuthBar() {
@@ -313,10 +453,235 @@
 
     auth.onAuthStateChanged(async (user) => {
         currentUser = user;
-        await loadUserProgress();
+        await loadProfile();
         renderAuthBar();
+        renderCharacterHeader();
         buildHomeScreen();
+        if (currentUser && !getActiveCharacter()) {
+            renderCharacterSelect();
+            switchScreen('screen-character-select');
+        } else {
+            switchScreen('screen-home');
+        }
     });
+
+    /* =========================================================
+       캐릭터 (아바타 / 헤더 / 선택 / 생성 / 상점)
+    ========================================================= */
+    const AVATAR_OPTIONS = ['🧑', '👦', '👧', '🧑‍🦱', '🐻', '🐼', '🐱', '🐶'];
+    const SHOP_ITEMS = [
+        { id: 'hat_top', slot: 'hat', emoji: '🎩', name: '멋진 모자', price: 50 },
+        { id: 'hat_crown', slot: 'hat', emoji: '👑', name: '반짝이는 왕관', price: 150 },
+        { id: 'glasses_sun', slot: 'glasses', emoji: '🕶️', name: '선글라스', price: 40 },
+        { id: 'glasses_round', slot: 'glasses', emoji: '👓', name: '동그란 안경', price: 30 },
+        { id: 'extra_scarf', slot: 'extra', emoji: '🧣', name: '따뜻한 목도리', price: 60 },
+        { id: 'extra_ribbon', slot: 'extra', emoji: '🎀', name: '예쁜 리본', price: 35 },
+        { id: 'extra_star', slot: 'extra', emoji: '⭐', name: '반짝 스티커', price: 20 }
+    ];
+    const SLOT_LABELS = { hat: '모자', glasses: '안경', extra: '기타 장식' };
+
+    function avatarHtml(character, size) {
+        size = size || 48;
+        const eq = character.equipped || {};
+        const hat = eq.hat ? SHOP_ITEMS.find(i => i.id === eq.hat) : null;
+        const glasses = eq.glasses ? SHOP_ITEMS.find(i => i.id === eq.glasses) : null;
+        const extra = eq.extra ? SHOP_ITEMS.find(i => i.id === eq.extra) : null;
+        return `
+            <div class="avatar-display" style="font-size:${size}px;">
+                <span class="avatar-base">${character.avatar}</span>
+                ${hat ? `<span class="acc-hat">${hat.emoji}</span>` : ''}
+                ${glasses ? `<span class="acc-glasses">${glasses.emoji}</span>` : ''}
+                ${extra ? `<span class="acc-extra">${extra.emoji}</span>` : ''}
+            </div>`;
+    }
+
+    function renderCharacterHeader() {
+        const header = document.getElementById('character-header');
+        const character = getActiveCharacter();
+        if (!currentUser || !character) { header.style.display = 'none'; header.innerHTML = ''; return; }
+        header.style.display = 'flex';
+        const level = levelFromPoints(character.totalEarned || 0);
+        header.innerHTML = `
+            ${avatarHtml(character, 40)}
+            <div class="ch-info">
+                <div class="ch-name-row">${character.name} <span class="level-badge">Lv.${level}</span></div>
+                <div class="ch-points-row">💰 ${character.wallet || 0}P</div>
+            </div>
+            <button class="ch-icon-btn" onclick="openCharacterSelect()" title="캐릭터 전환">🔀</button>
+            <button class="ch-icon-btn" onclick="openShop()" title="상점">🛍️</button>
+        `;
+    }
+
+    function openCharacterSelect() {
+        renderCharacterSelect();
+        switchScreen('screen-character-select');
+    }
+
+    function renderCharacterSelect() {
+        const wrap = document.getElementById('character-select-list');
+        wrap.innerHTML = '';
+        profile.characters.forEach(c => {
+            const card = document.createElement('button');
+            card.className = 'character-card';
+            const level = levelFromPoints(c.totalEarned || 0);
+            card.innerHTML = `
+                ${avatarHtml(c, 44)}
+                <div class="cc-name">${c.name}</div>
+                <div class="cc-level">Lv.${level} · 💰${c.wallet || 0}P</div>
+            `;
+            card.onclick = () => selectCharacter(c.id);
+            wrap.appendChild(card);
+        });
+        document.getElementById('character-add-btn').style.display = profile.characters.length < 2 ? 'block' : 'none';
+    }
+
+    function selectCharacter(id) {
+        profile.activeCharacterId = id;
+        saveProfile();
+        renderCharacterHeader();
+        buildHomeScreen();
+        switchScreen('screen-home');
+    }
+
+    let selectedAvatar = null;
+    let selectedGender = null;
+
+    function renderCharacterCreateScreen() {
+        selectedAvatar = null;
+        selectedGender = null;
+        document.getElementById('cc-name-input').value = '';
+        document.getElementById('cc-age-input').value = '';
+        document.querySelectorAll('.gender-btn').forEach(b => b.classList.remove('selected'));
+        const grid = document.getElementById('avatar-grid');
+        grid.innerHTML = '';
+        AVATAR_OPTIONS.forEach(av => {
+            const b = document.createElement('button');
+            b.className = 'avatar-option-btn';
+            b.type = 'button';
+            b.innerText = av;
+            b.onclick = () => {
+                selectedAvatar = av;
+                document.querySelectorAll('.avatar-option-btn').forEach(x => x.classList.remove('selected'));
+                b.classList.add('selected');
+            };
+            grid.appendChild(b);
+        });
+    }
+
+    function selectGender(g, btn) {
+        selectedGender = g;
+        document.querySelectorAll('.gender-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+    }
+
+    function createCharacter() {
+        const name = document.getElementById('cc-name-input').value.trim();
+        const ageVal = document.getElementById('cc-age-input').value;
+        if (profile.characters.length >= 2) { alert('캐릭터는 최대 2개까지 만들 수 있어요!'); return; }
+        if (!name) { alert('이름을 입력해주세요!'); return; }
+        if (!selectedGender) { alert('성별을 선택해주세요!'); return; }
+        if (!selectedAvatar) { alert('캐릭터 모양을 골라주세요!'); return; }
+
+        const character = {
+            id: 'char_' + Date.now(),
+            name: name,
+            age: ageVal ? Number(ageVal) : null,
+            gender: selectedGender,
+            avatar: selectedAvatar,
+            equipped: { hat: null, glasses: null, extra: null },
+            owned: [],
+            wallet: 0,
+            totalEarned: 0,
+            topics: {}
+        };
+        profile.characters.push(character);
+        profile.activeCharacterId = character.id;
+        saveProfile();
+        renderCharacterHeader();
+        buildHomeScreen();
+        switchScreen('screen-home');
+    }
+
+    function openShop() {
+        if (!getActiveCharacter()) return;
+        renderShop();
+        switchScreen('screen-shop');
+    }
+
+    function renderShop() {
+        const character = getActiveCharacter();
+        if (!character) return;
+        document.getElementById('shop-preview').innerHTML = avatarHtml(character, 64);
+        document.getElementById('shop-wallet').innerText = (character.wallet || 0) + 'P';
+
+        const list = document.getElementById('shop-item-list');
+        list.innerHTML = '';
+        ['hat', 'glasses', 'extra'].forEach(slot => {
+            const section = document.createElement('div');
+            section.className = 'shop-slot-section';
+            section.innerHTML = `<h3 class="shop-slot-title">${SLOT_LABELS[slot]}</h3>`;
+            const grid = document.createElement('div');
+            grid.className = 'shop-item-grid';
+            SHOP_ITEMS.filter(i => i.slot === slot).forEach(item => {
+                const owned = character.owned.includes(item.id);
+                const equipped = character.equipped[slot] === item.id;
+                const card = document.createElement('div');
+                card.className = 'shop-item-card';
+                let btnLabel, btnDisabled = false, btnAction;
+                if (equipped) {
+                    btnLabel = '장착됨 (해제)';
+                    btnAction = () => unequipItem(slot);
+                } else if (owned) {
+                    btnLabel = '장착하기';
+                    btnAction = () => equipItem(slot, item.id);
+                } else if ((character.wallet || 0) >= item.price) {
+                    btnLabel = `구매 (${item.price}P)`;
+                    btnAction = () => buyItem(item);
+                } else {
+                    btnLabel = '포인트 부족';
+                    btnDisabled = true;
+                }
+                card.innerHTML = `
+                    <div class="shop-item-emoji">${item.emoji}</div>
+                    <div class="shop-item-name">${item.name}</div>
+                    <button class="shop-item-btn${equipped ? ' equipped' : ''}" ${btnDisabled ? 'disabled' : ''}>${btnLabel}</button>
+                `;
+                if (!btnDisabled) card.querySelector('button').onclick = btnAction;
+                grid.appendChild(card);
+            });
+            section.appendChild(grid);
+            list.appendChild(section);
+        });
+    }
+
+    function buyItem(item) {
+        const character = getActiveCharacter();
+        if (!character || (character.wallet || 0) < item.price) return;
+        character.wallet -= item.price;
+        if (!character.owned.includes(item.id)) character.owned.push(item.id);
+        character.equipped[item.slot] = item.id;
+        saveProfile();
+        renderShop();
+        renderCharacterHeader();
+    }
+
+    function equipItem(slot, itemId) {
+        const character = getActiveCharacter();
+        if (!character) return;
+        character.equipped[slot] = itemId;
+        saveProfile();
+        renderShop();
+        renderCharacterHeader();
+    }
+
+    function unequipItem(slot) {
+        const character = getActiveCharacter();
+        if (!character) return;
+        character.equipped[slot] = null;
+        saveProfile();
+        renderShop();
+        renderCharacterHeader();
+    }
 
     const BOARD_SIZE = 9;
     const CELL_SIZE = 40;
@@ -901,17 +1266,20 @@
     function buildHomeScreen() {
         let list = document.getElementById('topic-list');
         list.innerHTML = '';
+        const character = getActiveCharacter();
+        const locked = !currentUser || !character;
         TOPICS.forEach(t => {
             let btn = document.createElement('button');
-            btn.className = 'topic-btn';
-            let record = userProgress[t.key];
+            btn.className = 'topic-btn' + (locked ? ' locked' : '');
+            let record = character && character.topics[t.key];
             let points = (record && record.points) || 0;
             let level = levelFromPoints(points);
             let progressInLevel = points % POINTS_PER_LEVEL;
             let clearedMark = record && record.cleared ? ' ✅' : '';
+            let lockIcon = locked ? '🔒 ' : '';
             btn.innerHTML = `
                 <div class="topic-top-row">
-                    <span>${t.title}</span>
+                    <span>${lockIcon}${t.title}</span>
                     <span class="level-badge">Lv.${level}${clearedMark}</span>
                 </div>
                 <span class="desc-line">${t.sub} · 랜덤 20문제</span>
@@ -928,9 +1296,15 @@
         document.getElementById(screenId).classList.add('active');
     }
 
-    function goHome() { switchScreen('screen-home'); }
+    function goHome() {
+        renderCharacterHeader();
+        buildHomeScreen();
+        switchScreen('screen-home');
+    }
 
     function startTopic(topicKey) {
+        if (!currentUser) { alert('먼저 구글 로그인을 해주세요!'); return; }
+        if (!getActiveCharacter()) { openCharacterSelect(); return; }
         currentTopicKey = topicKey;
         let topic = TOPICS.find(t => t.key === topicKey);
         problemsList = generateTopicSet(topic.tiers);
@@ -1107,8 +1481,9 @@
             document.getElementById('result-topic-msg').innerText =
                 `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
             const saveMsgEl = document.getElementById('result-save-msg');
-            if (currentUser) {
-                const levelResult = saveUserProgress(currentTopicKey, totalScore, problemsList.length * 10);
+            if (currentUser && getActiveCharacter()) {
+                const levelResult = saveTopicResult(currentTopicKey, totalScore, problemsList.length * 10);
+                renderCharacterHeader();
                 saveMsgEl.innerText = (levelResult && levelResult.newLevel > levelResult.prevLevel)
                     ? `기록이 저장됐어요! 🙌  🎉 레벨업! Lv.${levelResult.newLevel} 달성!`
                     : '기록이 저장됐어요! 🙌';
