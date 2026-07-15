@@ -390,16 +390,33 @@
         return Math.min(countClearedTopics(character) + 1, TOPICS.length);
     }
 
+    // 총 획득 포인트 = 모든 레벨의 최고 기록(레벨당 최대 100점)을 더한 값.
+    // 같은 레벨을 아무리 반복해도 그 레벨의 최고 기록 이상으로는 늘지 않는다.
+    function totalEarnedPoints(character) {
+        if (!character) return 0;
+        return TOPICS.reduce((sum, t) => sum + topicPoints(character.topics[t.key]), 0);
+    }
+
+    // 상점에서 쓸 수 있는 잔액 = 총 획득 포인트 - 지금까지 구매에 쓴 포인트.
+    function walletBalance(character) {
+        if (!character) return 0;
+        const spent = (character.owned || []).reduce((sum, itemId) => {
+            const item = SHOP_ITEMS.find(i => i.id === itemId);
+            return sum + (item ? item.price : 0);
+        }, 0);
+        return totalEarnedPoints(character) - spent;
+    }
+
     // 이 기능 이전에 저장된 예전 형식(uid 문서 바로 아래에 주제별 기록)을 캐릭터 1명으로 이전한다.
+    // 예전 누적 방식 점수는 100점 상한으로 정리해서 옮긴다.
     function migrateLegacyProgress(data) {
         if (data.characters) return data;
         const topicKeys = new Set(TOPICS.map(t => t.key));
         const legacyTopics = {};
-        let totalEarned = 0;
         Object.keys(data).forEach(k => {
             if (topicKeys.has(k) && data[k] && typeof data[k] === 'object') {
-                legacyTopics[k] = data[k];
-                totalEarned += data[k].points || 0;
+                const points = Math.min(SCORE_MAX, data[k].points || 0);
+                legacyTopics[k] = { total: SCORE_MAX, cleared: points >= CLEAR_THRESHOLD, points, lastPlayed: data[k].lastPlayed || Date.now() };
             }
         });
         if (Object.keys(legacyTopics).length === 0) {
@@ -407,8 +424,7 @@
         }
         const character = {
             id: 'char_legacy', name: '바둑이', age: null, gender: 'none', avatar: '🧑',
-            equipped: { hat: null, glasses: null, extra: null }, owned: [],
-            wallet: totalEarned, totalEarned: totalEarned, topics: legacyTopics
+            equipped: { hat: null, glasses: null, extra: null }, owned: [], topics: legacyTopics
         };
         return { characters: [character], activeCharacterId: character.id };
     }
@@ -449,9 +465,8 @@
             points: newBest,
             lastPlayed: Date.now()
         };
-        // 상점 화폐(지갑)와 캐릭터 전체 누적 통계는 매 판 얻은 원점수를 계속 쌓는다 (레벨 클리어 기준과는 별개).
-        character.totalEarned = (character.totalEarned || 0) + roundScore;
-        character.wallet = (character.wallet || 0) + roundScore;
+        // 상점 포인트는 별도로 누적하지 않는다 - 모든 레벨의 최고 기록 합계에서
+        // 실시간으로 계산되므로(totalEarnedPoints/walletBalance), 여기서 따로 더할 필요가 없다.
         saveProfile();
         const justCleared = prevBest < CLEAR_THRESHOLD && newBest >= CLEAR_THRESHOLD;
         return { justCleared, newCharacterLevel: characterLevel(character), scaledScore };
@@ -531,7 +546,7 @@
             ${avatarHtml(character, 40)}
             <div class="ch-info">
                 <div class="ch-name-row">${character.name} <span class="level-badge">Lv.${level}</span></div>
-                <div class="ch-points-row">💰 ${character.wallet || 0}P</div>
+                <div class="ch-points-row">💰 ${walletBalance(character)}P</div>
             </div>
             <button class="ch-icon-btn" onclick="openCharacterSelect()" title="캐릭터 전환">🔀</button>
             <button class="ch-icon-btn" onclick="openShop()" title="상점">🛍️</button>
@@ -553,7 +568,7 @@
             card.innerHTML = `
                 ${avatarHtml(c, 44)}
                 <div class="cc-name">${c.name}</div>
-                <div class="cc-level">Lv.${level} · 💰${c.wallet || 0}P</div>
+                <div class="cc-level">Lv.${level} · 💰${walletBalance(c)}P</div>
             `;
             card.onclick = () => selectCharacter(c.id);
             wrap.appendChild(card);
@@ -616,8 +631,6 @@
             avatar: selectedAvatar,
             equipped: { hat: null, glasses: null, extra: null },
             owned: [],
-            wallet: 0,
-            totalEarned: 0,
             topics: {}
         };
         profile.characters.push(character);
@@ -638,7 +651,8 @@
         const character = getActiveCharacter();
         if (!character) return;
         document.getElementById('shop-preview').innerHTML = avatarHtml(character, 64);
-        document.getElementById('shop-wallet').innerText = (character.wallet || 0) + 'P';
+        const balance = walletBalance(character);
+        document.getElementById('shop-wallet').innerText = balance + 'P';
 
         const list = document.getElementById('shop-item-list');
         list.innerHTML = '';
@@ -660,7 +674,7 @@
                 } else if (owned) {
                     btnLabel = '장착하기';
                     btnAction = () => equipItem(slot, item.id);
-                } else if ((character.wallet || 0) >= item.price) {
+                } else if (balance >= item.price) {
                     btnLabel = `구매 (${item.price}P)`;
                     btnAction = () => buyItem(item);
                 } else {
@@ -682,8 +696,7 @@
 
     function buyItem(item) {
         const character = getActiveCharacter();
-        if (!character || (character.wallet || 0) < item.price) return;
-        character.wallet -= item.price;
+        if (!character || walletBalance(character) < item.price) return;
         if (!character.owned.includes(item.id)) character.owned.push(item.id);
         character.equipped[item.slot] = item.id;
         saveProfile();
