@@ -4,6 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>어린이 바둑교실: 주제별 마스터</title>
+    <script>
+    (function () {
+        // 카카오톡 인앱 브라우저는 구글 로그인을 정책상 막기 때문에 외부 브라우저로 내보낸다.
+        var isKakao = /KAKAOTALK/i.test(navigator.userAgent || '');
+        if (!isKakao) return;
+
+        location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href);
+
+        // 위 스킴 리다이렉트가 동작하지 않는 환경(iOS 등)을 대비한 안내 배너
+        document.addEventListener('DOMContentLoaded', function () {
+            var banner = document.createElement('div');
+            banner.id = 'kakao-fallback-banner';
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;'
+                + 'background:#fee500;color:#3c1e1e;padding:12px 16px;font-size:14px;'
+                + 'line-height:1.5;font-weight:bold;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,0.2);';
+            banner.innerHTML = '⚠️ 카카오톡에서는 구글 로그인이 되지 않아요!<br>'
+                + '오른쪽 아래(또는 위) <b>≡ 메뉴 → "다른 브라우저로 열기"</b>를 눌러주세요.';
+            document.body.prepend(banner);
+            document.body.style.paddingTop = (banner.offsetHeight + 10) + 'px';
+        });
+    })();
+    </script>
     <style>
         body {
             font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
@@ -203,7 +225,15 @@
     function signInGoogle() {
         const provider = new firebase.auth.GoogleAuthProvider();
         auth.signInWithPopup(provider).catch(err => {
-            alert('로그인에 실패했어요: ' + err.message);
+            const isInAppBrowserError =
+                err.code === 'auth/operation-not-supported-in-this-environment' ||
+                (err.message && err.message.includes('disallowed_useragent'));
+            if (isInAppBrowserError) {
+                alert('카카오톡, 인스타그램 등 앱 내부 브라우저에서는 구글 로그인이 지원되지 않아요.\n' +
+                    '크롬이나 사파리 같은 일반 브라우저로 열어서 다시 시도해주세요.');
+            } else {
+                alert('로그인에 실패했어요: ' + err.message);
+            }
         });
     }
     function signOutUser() { auth.signOut(); }
