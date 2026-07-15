@@ -362,9 +362,28 @@
     }
     function signOutUser() { auth.signOut(); }
 
+    // 레벨 = 목차의 원기호 번호 순서 그대로. 한 레벨은 100점을 모아야 클리어되고,
+    // 클리어해야만 다음 원기호 레벨이 열린다.
     const POINTS_PER_LEVEL = 100;
-    function levelFromPoints(points) {
-        return Math.floor((points || 0) / POINTS_PER_LEVEL) + 1;
+
+    function isTopicUnlocked(idx, character) {
+        if (idx === 0) return true;
+        const prevRecord = character.topics[TOPICS[idx - 1].key];
+        return !!(prevRecord && (prevRecord.points || 0) >= POINTS_PER_LEVEL);
+    }
+
+    function countClearedTopics(character) {
+        if (!character) return 0;
+        return TOPICS.filter(t => {
+            const r = character.topics[t.key];
+            return r && (r.points || 0) >= POINTS_PER_LEVEL;
+        }).length;
+    }
+
+    // 캐릭터 전체 레벨 = 클리어한 레벨 수 + 1 (지금 도전 중인 레벨 번호)
+    function characterLevel(character) {
+        if (!character) return 1;
+        return Math.min(countClearedTopics(character) + 1, TOPICS.length);
     }
 
     // 이 기능 이전에 저장된 예전 형식(uid 문서 바로 아래에 주제별 기록)을 캐릭터 1명으로 이전한다.
@@ -410,25 +429,27 @@
         return profile.characters.find(c => c.id === profile.activeCharacterId) || null;
     }
 
-    // 저장은 즉시 반영(로컬)하고 Firestore 쓰기는 비동기로 흘려보낸다. 레벨업 여부를 바로 알 수 있도록 동기 반환.
+    // 저장은 즉시 반영(로컬)하고 Firestore 쓰기는 비동기로 흘려보낸다.
+    // 이번 판으로 그 레벨이 100점을 처음 넘겼는지(=방금 클리어했는지)를 바로 알 수 있도록 동기 반환.
     function saveTopicResult(topicKey, score, total) {
         const character = getActiveCharacter();
         if (!currentUser || !character) return null;
         const prevRecord = character.topics[topicKey] || {};
         const prevBest = prevRecord.best || 0;
         const prevTopicPoints = prevRecord.points || 0;
+        const newTopicPoints = prevTopicPoints + score;
         character.topics[topicKey] = {
             best: Math.max(prevBest, score),
             total: total,
-            cleared: true,
-            points: prevTopicPoints + score,
+            cleared: newTopicPoints >= POINTS_PER_LEVEL,
+            points: newTopicPoints,
             lastPlayed: Date.now()
         };
-        const prevTotalEarned = character.totalEarned || 0;
-        character.totalEarned = prevTotalEarned + score;
+        character.totalEarned = (character.totalEarned || 0) + score;
         character.wallet = (character.wallet || 0) + score;
         saveProfile();
-        return { prevLevel: levelFromPoints(prevTotalEarned), newLevel: levelFromPoints(character.totalEarned) };
+        const justCleared = prevTopicPoints < POINTS_PER_LEVEL && newTopicPoints >= POINTS_PER_LEVEL;
+        return { justCleared, newCharacterLevel: characterLevel(character) };
     }
 
     function renderAuthBar() {
@@ -500,7 +521,7 @@
         const character = getActiveCharacter();
         if (!currentUser || !character) { header.style.display = 'none'; header.innerHTML = ''; return; }
         header.style.display = 'flex';
-        const level = levelFromPoints(character.totalEarned || 0);
+        const level = characterLevel(character);
         header.innerHTML = `
             ${avatarHtml(character, 40)}
             <div class="ch-info">
@@ -523,7 +544,7 @@
         profile.characters.forEach(c => {
             const card = document.createElement('button');
             card.className = 'character-card';
-            const level = levelFromPoints(c.totalEarned || 0);
+            const level = characterLevel(c);
             card.innerHTML = `
                 ${avatarHtml(c, 44)}
                 <div class="cc-name">${c.name}</div>
@@ -1267,24 +1288,38 @@
         let list = document.getElementById('topic-list');
         list.innerHTML = '';
         const character = getActiveCharacter();
-        const locked = !currentUser || !character;
-        TOPICS.forEach(t => {
+        const hasCharacter = !!(currentUser && character);
+        TOPICS.forEach((t, idx) => {
             let btn = document.createElement('button');
-            btn.className = 'topic-btn' + (locked ? ' locked' : '');
-            let record = character && character.topics[t.key];
+            let record = hasCharacter && character.topics[t.key];
             let points = (record && record.points) || 0;
-            let level = levelFromPoints(points);
-            let progressInLevel = points % POINTS_PER_LEVEL;
-            let clearedMark = record && record.cleared ? ' ✅' : '';
+            let isCleared = points >= POINTS_PER_LEVEL;
+            let unlocked = hasCharacter && isTopicUnlocked(idx, character);
+            let locked = !hasCharacter || !unlocked;
+            btn.className = 'topic-btn' + (locked ? ' locked' : '');
             let lockIcon = locked ? '🔒 ' : '';
+            let badge = isCleared ? '<span class="level-badge">✅ 클리어</span>' : '';
+
+            let progressLine;
+            if (!hasCharacter) {
+                progressLine = '';
+            } else if (!unlocked) {
+                progressLine = `<span class="topic-progress-text">이전 레벨을 클리어하면 열려요</span>`;
+            } else {
+                let shown = Math.min(points, POINTS_PER_LEVEL);
+                let remain = isCleared ? '' : ` (클리어까지 ${POINTS_PER_LEVEL - shown}점)`;
+                progressLine = `
+                    <div class="topic-progress-bg"><div class="topic-progress-fill" style="width:${shown}%"></div></div>
+                    <span class="topic-progress-text">${shown}/${POINTS_PER_LEVEL}${remain}</span>`;
+            }
+
             btn.innerHTML = `
                 <div class="topic-top-row">
                     <span>${lockIcon}${t.title}</span>
-                    <span class="level-badge">Lv.${level}${clearedMark}</span>
+                    ${badge}
                 </div>
                 <span class="desc-line">${t.sub} · 랜덤 20문제</span>
-                <div class="topic-progress-bg"><div class="topic-progress-fill" style="width:${progressInLevel}%"></div></div>
-                <span class="topic-progress-text">${progressInLevel}/${POINTS_PER_LEVEL} (다음 레벨까지 ${POINTS_PER_LEVEL - progressInLevel}점)</span>
+                ${progressLine}
             `;
             btn.onclick = () => startTopic(t.key);
             list.appendChild(btn);
@@ -1304,7 +1339,10 @@
 
     function startTopic(topicKey) {
         if (!currentUser) { alert('먼저 구글 로그인을 해주세요!'); return; }
-        if (!getActiveCharacter()) { openCharacterSelect(); return; }
+        const character = getActiveCharacter();
+        if (!character) { openCharacterSelect(); return; }
+        const idx = TOPICS.findIndex(t => t.key === topicKey);
+        if (!isTopicUnlocked(idx, character)) { alert('이전 레벨을 먼저 클리어해야 열려요!'); return; }
         currentTopicKey = topicKey;
         let topic = TOPICS.find(t => t.key === topicKey);
         problemsList = generateTopicSet(topic.tiers);
@@ -1482,10 +1520,10 @@
                 `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
             const saveMsgEl = document.getElementById('result-save-msg');
             if (currentUser && getActiveCharacter()) {
-                const levelResult = saveTopicResult(currentTopicKey, totalScore, problemsList.length * 10);
+                const result = saveTopicResult(currentTopicKey, totalScore, problemsList.length * 10);
                 renderCharacterHeader();
-                saveMsgEl.innerText = (levelResult && levelResult.newLevel > levelResult.prevLevel)
-                    ? `기록이 저장됐어요! 🙌  🎉 레벨업! Lv.${levelResult.newLevel} 달성!`
+                saveMsgEl.innerText = (result && result.justCleared)
+                    ? `기록이 저장됐어요! 🙌  🎉 레벨 클리어! 다음 레벨이 열렸어요! (Lv.${result.newCharacterLevel})`
                     : '기록이 저장됐어요! 🙌';
             } else {
                 saveMsgEl.innerText = '로그인하면 기록이 저장돼요. (홈 화면에서 로그인해보세요!)';
