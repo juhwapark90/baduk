@@ -49,6 +49,27 @@
         .topic-btn .desc-line { display: block; font-size: 11px; font-weight: normal; opacity: 0.9; margin-top: 3px; }
         .topic-btn:hover { transform: translateY(-2px); filter: brightness(1.07); }
         .topic-btn:active { transform: translateY(0); }
+        .topic-btn .badge {
+            display: inline-block; margin-top: 4px; font-size: 11px; font-weight: bold;
+            background: rgba(255,255,255,0.25); padding: 2px 8px; border-radius: 10px;
+        }
+
+        /* 로그인 바 */
+        .auth-bar { width: 100%; margin-bottom: 14px; }
+        .login-btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+            padding: 11px; font-size: 14px; font-weight: bold; color: #444; background: white;
+            border: 2px solid #ddd; border-radius: 10px; cursor: pointer;
+        }
+        .login-btn:hover { background: #f5f5f5; }
+        .user-bar {
+            display: flex; align-items: center; justify-content: space-between; background: #f1f8f1;
+            border: 2px solid #c3dec3; border-radius: 10px; padding: 8px 12px; box-sizing: border-box;
+        }
+        .user-bar .user-info { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: bold; color: #2c5e43; text-align: left; }
+        .user-bar img { width: 28px; height: 28px; border-radius: 50%; }
+        .user-bar .logout-btn { font-size: 12px; color: #888; background: none; border: none; cursor: pointer; text-decoration: underline; }
+        .result-save-msg { font-size: 13px; color: #777; margin-bottom: 10px; }
 
         .home-btn {
             display: block; width: 100%; padding: 15px; margin-top: 15px; font-size: 16px; font-weight: bold;
@@ -109,6 +130,7 @@
         <div class="title-logo">⚫어린이 바둑교실⚪</div>
         <h2>주제를 골라 도전하세요!</h2>
         <p class="subtitle">주제를 누르면 매번 새로운 문제 20개가 쉬운 것부터 어려운 순서로 만들어져요.</p>
+        <div class="auth-bar" id="auth-bar"></div>
         <div class="topic-list" id="topic-list"></div>
     </div>
 </div>
@@ -147,6 +169,7 @@
         <div class="result-msg" id="result-topic-msg">20개의 문제를 모두 풀었어요!</div>
         <div>이번 도전 점수는?</div>
         <div class="result-score"><span id="final-score">0</span>점</div>
+        <div class="result-save-msg" id="result-save-msg"></div>
         <div class="result-btns">
             <button class="home-btn" onclick="retryTopic()">🔄 이 주제 다시 도전</button>
             <button class="home-btn" onclick="goHome()">🏠 주제 목록</button>
@@ -154,7 +177,92 @@
     </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
 <script>
+    /* =========================================================
+       Firebase 로그인 및 기록 저장
+    ========================================================= */
+    const firebaseConfig = {
+        apiKey: "AIzaSyAnSAHtjJBprCaDAVJbR3arKpBXNe1fJes",
+        authDomain: "baduk-6654f.firebaseapp.com",
+        projectId: "baduk-6654f",
+        storageBucket: "baduk-6654f.firebasestorage.app",
+        messagingSenderId: "791976191162",
+        appId: "1:791976191162:web:bd636f60f2524a96590e83"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+    let userProgress = {};
+
+    function signInGoogle() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(err => {
+            alert('로그인에 실패했어요: ' + err.message);
+        });
+    }
+    function signOutUser() { auth.signOut(); }
+
+    async function loadUserProgress() {
+        if (!currentUser) { userProgress = {}; return; }
+        try {
+            const doc = await db.collection('progress').doc(currentUser.uid).get();
+            userProgress = doc.exists ? doc.data() : {};
+        } catch (e) {
+            console.error(e);
+            userProgress = {};
+        }
+    }
+
+    async function saveUserProgress(topicKey, score, total) {
+        if (!currentUser) return;
+        const prevBest = (userProgress[topicKey] && userProgress[topicKey].best) || 0;
+        const entry = {
+            best: Math.max(prevBest, score),
+            total: total,
+            cleared: true,
+            lastPlayed: Date.now()
+        };
+        userProgress[topicKey] = entry;
+        try {
+            await db.collection('progress').doc(currentUser.uid).set({ [topicKey]: entry }, { merge: true });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function renderAuthBar() {
+        const bar = document.getElementById('auth-bar');
+        if (!bar) return;
+        if (currentUser) {
+            bar.innerHTML = `
+                <div class="user-bar">
+                    <div class="user-info">
+                        <img src="${currentUser.photoURL || ''}" onerror="this.style.display='none'">
+                        <span>${currentUser.displayName || '바둑이'}님 환영해요!</span>
+                    </div>
+                    <button class="logout-btn" onclick="signOutUser()">로그아웃</button>
+                </div>`;
+        } else {
+            bar.innerHTML = `
+                <button class="login-btn" onclick="signInGoogle()">
+                    🔵 구글 계정으로 로그인하고 기록 저장하기
+                </button>`;
+        }
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+        currentUser = user;
+        await loadUserProgress();
+        renderAuthBar();
+        buildHomeScreen();
+    });
+
     const BOARD_SIZE = 9;
     const CELL_SIZE = 40;
     const OFFSET = 20;
@@ -674,7 +782,9 @@
         TOPICS.forEach(t => {
             let btn = document.createElement('button');
             btn.className = 'topic-btn';
-            btn.innerHTML = `${t.title}<span class="desc-line">${t.sub} · 랜덤 20문제</span>`;
+            let record = userProgress[t.key];
+            let badge = record ? `<span class="badge">✅ 최고 ${record.best}점</span>` : '';
+            btn.innerHTML = `${t.title}<span class="desc-line">${t.sub} · 랜덤 20문제 ${badge}</span>`;
             btn.onclick = () => startTopic(t.key);
             list.appendChild(btn);
         });
@@ -837,6 +947,13 @@
             let topic = TOPICS.find(t => t.key === currentTopicKey);
             document.getElementById('result-topic-msg').innerText =
                 `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
+            const saveMsgEl = document.getElementById('result-save-msg');
+            if (currentUser) {
+                saveUserProgress(currentTopicKey, totalScore, problemsList.length * 10);
+                saveMsgEl.innerText = '기록이 저장됐어요! 🙌';
+            } else {
+                saveMsgEl.innerText = '로그인하면 기록이 저장돼요. (홈 화면에서 로그인해보세요!)';
+            }
             switchScreen('screen-result');
         } else {
             loadProblem();
