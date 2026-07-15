@@ -1166,43 +1166,129 @@
     /* =========================================================
        ⓪ 승부 결정하기 (집 세기 / 승자 맞히기)
     ========================================================= */
-    // 바둑판을 왼쪽/오른쪽(또는 위/아래) 두 영역으로 나누는 경계선을 무작위로 그려서
-    // 각 영역을 한쪽 돌의 집(영토)으로 만든다. 각 줄마다 경계 돌을 1개씩 두므로
-    // 경계선이 어떤 모양이어도 두 영역은 항상 완전히 분리된다 (다른 색 집이 섞이지 않음).
+    // 흑/백 각각 1~3개의 씨앗점을 무작위로 뿌리고, 모든 칸을 "가장 가까운 씨앗의 색"에
+    // 배정하는 방식(보로노이 분할)으로 집 모양을 만든다. 이러면 매번 다른 모양의
+    // 자연스러운(동서/남북 한 줄로 안 갈리는) 집이 나오고, 씨앗을 여러 개 두면 한쪽
+    // 색이 여러 군데로 나뉜 집을 가질 수도 있다. 두 색이 만나는 경계 칸은 돌로,
+    // 자기 색 칸으로만 둘러싸인 칸은 집(영토)으로 처리한다.
+    // 실전 느낌을 위해, 활로가 1개뿐(단수 상태)인 돌이 하나라도 있으면 그 배치는 버리고 다시 만든다.
     function genTerritoryProblem(difficulty) {
         let fallback = null;
-        for (let attempt = 0; attempt < 300; attempt++) {
-            let vertical = Math.random() < 0.5;
-            let c = randInt(3, 5);
-            let path = [];
-            for (let row = 0; row < BOARD_SIZE; row++) {
-                c += randInt(-1, 1);
-                c = Math.max(1, Math.min(7, c));
-                path.push(c);
+        for (let attempt = 0; attempt < 500; attempt++) {
+            const seeds = [];
+            const usedSeedKeys = new Set();
+            const addSeeds = (side, count) => {
+                let added = 0, tries = 0;
+                while (added < count && tries < 50) {
+                    tries++;
+                    const x = randInt(0, 8), y = randInt(0, 8);
+                    const k = key(x, y);
+                    if (usedSeedKeys.has(k)) continue;
+                    usedSeedKeys.add(k);
+                    // 씨앗 좌표에 작은 무작위 지터를 줘서, 두 씨앗이 우연히 같은 행/열에 놓여도
+                    // 경계가 완전한 직선(동서/남북 한 줄)이 되지 않고 항상 자연스럽게 구불거리게 한다.
+                    seeds.push({
+                        x, y, side,
+                        jx: x + (Math.random() - 0.5) * 1.8,
+                        jy: y + (Math.random() - 0.5) * 1.8
+                    });
+                    added++;
+                }
+            };
+            addSeeds('A', randInt(1, 3));
+            addSeeds('B', randInt(1, 3));
+            if (!seeds.some(s => s.side === 'A') || !seeds.some(s => s.side === 'B')) continue;
+
+            const ownerMap = {};
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    let best = null, bestDist = Infinity;
+                    seeds.forEach(s => {
+                        const d = Math.abs(s.jx - x) + Math.abs(s.jy - y);
+                        if (d < bestDist) { bestDist = d; best = s; }
+                    });
+                    ownerMap[key(x, y)] = best.side;
+                }
             }
 
-            let sideAStones = [], sideBStones = [];
+            // 모든 가로줄(또는 모든 세로줄)에서 A가 차지한 칸 수가 완전히 똑같으면
+            // 동서/남북으로 반듯하게 갈린 한 줄짜리 경계라는 뜻이므로 버리고 다시 만든다.
+            const rowCountsA = [], colCountsA = [];
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                let c = 0;
+                for (let x = 0; x < BOARD_SIZE; x++) if (ownerMap[key(x, y)] === 'A') c++;
+                rowCountsA.push(c);
+            }
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                let c = 0;
+                for (let y = 0; y < BOARD_SIZE; y++) if (ownerMap[key(x, y)] === 'A') c++;
+                colCountsA.push(c);
+            }
+            const isPerfectlyStraight = new Set(rowCountsA).size === 1 || new Set(colCountsA).size === 1;
+            if (isPerfectlyStraight) continue;
+
+            const sideAStones = [], sideBStones = [];
             let sideATerritory = 0, sideBTerritory = 0;
-            for (let row = 0; row < BOARD_SIZE; row++) {
-                let ac = path[row], bc = path[row] + 1;
-                let posA = vertical ? { x: ac, y: row } : { x: row, y: ac };
-                let posB = vertical ? { x: bc, y: row } : { x: row, y: bc };
-                sideAStones.push(posA);
-                sideBStones.push(posB);
-                sideATerritory += ac;
-                sideBTerritory += (8 - bc);
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    const mySide = ownerMap[key(x, y)];
+                    const isBoundary = neighbors4(x, y).some(([nx, ny]) => ownerMap[key(nx, ny)] !== mySide);
+                    if (isBoundary) {
+                        (mySide === 'A' ? sideAStones : sideBStones).push({ x, y });
+                    } else if (mySide === 'A') {
+                        sideATerritory++;
+                    } else {
+                        sideBTerritory++;
+                    }
+                }
             }
 
-            let scoreA = sideAStones.length + sideATerritory;
-            let scoreB = sideBStones.length + sideBTerritory;
-            let diff = Math.abs(scoreA - scoreB);
+            // 활로는 돌 하나가 아니라 "연결된 돌 무리(그룹)" 전체 기준으로 세야 바둑 규칙과 맞는다.
+            const sideAKeys = new Set(sideAStones.map(p => key(p.x, p.y)));
+            const sideBKeys = new Set(sideBStones.map(p => key(p.x, p.y)));
+            const allStoneKeys = new Set([...sideAKeys, ...sideBKeys]);
 
-            let inRange = difficulty === 'easy' ? diff >= 8 :
+            const minGroupLiberties = (stoneList, ownKeys) => {
+                const visited = new Set();
+                let minLibs = Infinity;
+                stoneList.forEach(({ x, y }) => {
+                    const startKey = key(x, y);
+                    if (visited.has(startKey)) return;
+                    visited.add(startKey);
+                    const stack = [[x, y]];
+                    const libSet = new Set();
+                    while (stack.length) {
+                        const [cx, cy] = stack.pop();
+                        neighbors4(cx, cy).forEach(([nx, ny]) => {
+                            const nk = key(nx, ny);
+                            if (!allStoneKeys.has(nk)) {
+                                libSet.add(nk);
+                            } else if (ownKeys.has(nk) && !visited.has(nk)) {
+                                visited.add(nk);
+                                stack.push([nx, ny]);
+                            }
+                        });
+                    }
+                    if (libSet.size < minLibs) minLibs = libSet.size;
+                });
+                return minLibs;
+            };
+
+            const minLibsA = minGroupLiberties(sideAStones, sideAKeys);
+            const minLibsB = minGroupLiberties(sideBStones, sideBKeys);
+            if (minLibsA < 2 || minLibsB < 2) continue;
+
+            const scoreA = sideAStones.length + sideATerritory;
+            const scoreB = sideBStones.length + sideBTerritory;
+            const diff = Math.abs(scoreA - scoreB);
+            if (diff === 0) continue;
+
+            const inRange = difficulty === 'easy' ? diff >= 8 :
                 difficulty === 'medium' ? (diff >= 3 && diff <= 9) :
                 (diff >= 1 && diff <= 4);
 
-            if (diff > 0) fallback = { sideAStones, sideBStones, scoreA, scoreB };
-            if (inRange) { fallback = { sideAStones, sideBStones, scoreA, scoreB }; break; }
+            fallback = { sideAStones, sideBStones, scoreA, scoreB };
+            if (inRange) break;
         }
         let best = fallback;
         if (!best) return null;
