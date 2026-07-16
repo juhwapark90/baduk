@@ -227,6 +227,13 @@
         }
         .side-btn.selected { border-color: #2196F3; background: #e3f2fd; }
 
+        .number-choice-controls { flex-wrap: wrap; }
+        .number-btn {
+            flex: 1 1 40%; min-width: 70px; padding: 14px; font-size: 16px; font-weight: bold; cursor: pointer;
+            border: 3px solid #ddd; border-radius: 10px; background: white; color: #333; transition: 0.15s;
+        }
+        .number-btn.selected { border-color: #2196F3; background: #e3f2fd; }
+
         .message { font-size: 18px; margin-top: 15px; font-weight: bold; min-height: 27px; color: #d32f2f; }
         .success-msg { color: #388E3C; }
 
@@ -337,6 +344,8 @@
             <button class="side-btn" id="side-btn-black" onclick="chooseSide('black')">⚫ 흑 승리</button>
             <button class="side-btn" id="side-btn-white" onclick="chooseSide('white')">⚪ 백 승리</button>
         </div>
+
+        <div class="controls number-choice-controls" id="number-choice-controls" style="display:none;"></div>
 
         <div class="controls">
             <button id="btn-check" class="btn btn-check" onclick="checkAnswer()">정답 확인 ⭕</button>
@@ -1487,6 +1496,78 @@
     }
 
     /* =========================================================
+       집의 개념 : 몇집일까?
+    ========================================================= */
+    // 빈 칸 덩어리(growGroup 재사용)를 하나 무작위로 기르고, 그 덩어리를 완전히
+    // 둘러싸는 흑돌 벽을 만든다. 판 가장자리에 닿으면 벽이 뚫리므로 다시 만든다.
+    // mode:
+    //  - 'basic'/'shape' : 안에 아무것도 없이 그대로 센다 (shape는 더 큰 덩어리로
+    //                      다양하고 재미있는 모양이 나오게 한다)
+    //  - 'trick'         : 덩어리 안(빈 칸)에 백돌을 하나 몰래 놓아서 "안에 다른 색 돌이
+    //                      있으면 집이 아니다"(집 개수 0)를 보여준다
+    //  - 'application'   : 벽 바깥, 안쪽 빈 칸과는 직접 닿지 않는 자리에 백돌을 하나
+    //                      놓아서 "담벼락 바깥에 붙은 돌은 집에 영향이 없다"를 보여준다
+    function genTerritoryCount(mode) {
+        for (let attempt = 0; attempt < 200; attempt++) {
+            const size = mode === 'shape' ? randInt(10, 16) : randInt(6, 12);
+            const sx = randInt(3, 5), sy = randInt(3, 5);
+            const blobArr = growGroup(new Set(), size, sx, sy);
+            if (blobArr.length < size) continue;
+            const blobSet = new Set(blobArr.map(([x, y]) => key(x, y)));
+
+            let touchesEdge = false;
+            const wallSet = new Set();
+            blobArr.forEach(([x, y]) => {
+                if (x === 0 || x === 8 || y === 0 || y === 8) touchesEdge = true;
+                neighbors4(x, y).forEach(([nx, ny]) => {
+                    const nk = key(nx, ny);
+                    if (!blobSet.has(nk)) wallSet.add(nk);
+                });
+            });
+            if (touchesEdge || wallSet.size < 4) continue;
+
+            let whiteStones = [];
+            let answer = blobArr.length;
+            let desc = '까맣게 둘러싸인 빈 칸을 잘 세어보세요. 이 흑집은 몇 집일까요?';
+
+            if (mode === 'trick') {
+                const pick = blobArr[randInt(0, blobArr.length - 1)];
+                whiteStones = [{ x: pick[0], y: pick[1] }];
+                answer = 0;
+                desc = '집처럼 보이지만... 안을 자세히 살펴보세요! 백돌이 하나라도 있으면 그 집은 몇 집일까요?';
+            } else if (mode === 'application') {
+                const outerCandidates = [];
+                wallSet.forEach(wk => {
+                    const [wx, wy] = wk.split('_').map(Number);
+                    neighbors4(wx, wy).forEach(([ox, oy]) => {
+                        const ok = key(ox, oy);
+                        if (blobSet.has(ok) || wallSet.has(ok)) return;
+                        const touchesBlob = neighbors4(ox, oy).some(([nx, ny]) => blobSet.has(key(nx, ny)));
+                        if (!touchesBlob) outerCandidates.push({ x: ox, y: oy });
+                    });
+                });
+                if (outerCandidates.length === 0) continue;
+                whiteStones = [outerCandidates[randInt(0, outerCandidates.length - 1)]];
+                desc = '담벼락 바깥에 백돌이 하나 붙어있어요. 안쪽 집 개수에 영향이 있을까요? 몇 집인지 세어보세요!';
+            }
+
+            const blackStones = [...wallSet].map(k => { const [x, y] = k.split('_').map(Number); return { x, y }; });
+
+            const decoyPool = new Set();
+            if (answer === 0) {
+                [blobArr.length, blobArr.length - 1, blobArr.length + 1].forEach(n => { if (n > 0) decoyPool.add(n); });
+            } else {
+                [answer - 2, answer - 1, answer + 1, answer + 2, 0].forEach(n => { if (n >= 0 && n !== answer) decoyPool.add(n); });
+            }
+            const decoys = shuffle([...decoyPool]).slice(0, 3);
+            const options = shuffle([answer, ...decoys]);
+
+            return { type: 'choose_number', blackStones, whiteStones, answer, options, desc };
+        }
+        return null;
+    }
+
+    /* =========================================================
        주제 목록 및 문제 세트 생성
     ========================================================= */
     function safeCall(fn) {
@@ -1575,6 +1656,54 @@
         }
     ];
 
+    // 집(둘러싸인 빈 칸)의 개념을 보여주는 슬라이드. 기본 개수 세기 -> 여러 칸 세기 ->
+    // 모양은 상관없다 -> (속임수) 안에 다른 색 돌이 있으면 0집 -> (응용) 벽 바깥에 붙은
+    // 돌은 영향 없다, 순서로 뒤에 나오는 퀴즈 4종류를 그대로 미리 보여준다.
+    const TERRITORY_LEARN_SLIDES = [
+        {
+            title: '① 집이란?',
+            desc: '흑돌로 완전히 둘러싸인 빈 칸을 "집"이라고 해요. 이 흑집은 1개예요!',
+            blackStones: [{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:1,y:2},{x:3,y:2},{x:1,y:3},{x:2,y:3},{x:3,y:3}],
+            whiteStones: [],
+            highlights: [{x:2,y:2}]
+        },
+        {
+            title: '② 집이 여러 칸일 수도 있어요',
+            desc: '둘러싸인 빈 칸이 여러 개면 그 개수만큼 집이에요. 이번엔 4집이에요!',
+            blackStones: [{x:0,y:1},{x:0,y:2},{x:3,y:1},{x:3,y:2},{x:1,y:0},{x:2,y:0},{x:1,y:3},{x:2,y:3}],
+            whiteStones: [],
+            highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2},{x:2,y:2}]
+        },
+        {
+            title: '③ 모양은 상관없어요',
+            desc: '집은 네모 모양이 아니어도 괜찮아요. 둘러싸여 있기만 하면 어떤 모양이든 집이에요! (이건 3집)',
+            blackStones: [{x:0,y:1},{x:1,y:0},{x:3,y:1},{x:2,y:0},{x:2,y:2},{x:0,y:2},{x:1,y:3}],
+            whiteStones: [],
+            highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2}]
+        },
+        {
+            title: '④ 속임수! 안에 백돌이 있으면 0집',
+            desc: '집처럼 보여도 안에 백돌이 하나라도 있으면, 그 집은 통째로 0집이 돼요!',
+            blackStones: [{x:0,y:1},{x:0,y:2},{x:3,y:1},{x:3,y:2},{x:1,y:0},{x:2,y:0},{x:1,y:3},{x:2,y:3}],
+            whiteStones: [{x:2,y:2}],
+            highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2}]
+        },
+        {
+            title: '⑤ 담벼락 바깥에 있는 돌은 괜찮아요',
+            desc: '이 백돌은 담벼락 바깥에 붙어있을 뿐이에요. 안쪽 집 개수는 그대로! 여전히 4집이에요.',
+            blackStones: [{x:0,y:1},{x:0,y:2},{x:3,y:1},{x:3,y:2},{x:1,y:0},{x:2,y:0},{x:1,y:3},{x:2,y:3}],
+            whiteStones: [{x:0,y:0}],
+            highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2},{x:2,y:2}]
+        },
+        {
+            title: '⑥ 이제 퀴즈로 확인해봐요!',
+            desc: '다양한 모양의 집을 보고 몇 집인지 정확히 세어보세요. 안에 다른 색 돌이 숨어있는지도 잘 살펴봐야 해요!',
+            blackStones: [{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:1,y:2},{x:3,y:2},{x:1,y:3},{x:2,y:3},{x:3,y:3}],
+            whiteStones: [],
+            highlights: [{x:2,y:2}]
+        }
+    ];
+
     const TOPICS = [
         { key: 'catchbasics', title: '[Lv. 1] 돌 잡아먹기', sub: '단수된 돌을 잡는 원리를 배우고 연습해요',
           learnSlides: CATCH_LEARN_SLIDES,
@@ -1597,36 +1726,45 @@
                   return p;
               }
           ] },
-        { key: 'territory', title: '[Lv. 2] 승부 결정하기', sub: '집이 더 많은 쪽, 이긴 돌을 맞혀요',
+        { key: 'territorycount', title: '[Lv. 2] 집의 개념 : 몇집일까?', sub: '둘러싸인 빈 칸을 세어서 집이 몇 개인지 알아봐요',
+          learnSlides: TERRITORY_LEARN_SLIDES,
+          counts: [5, 5, 5, 5],
+          tiers: [
+              () => genTerritoryCount('basic'),
+              () => genTerritoryCount('shape'),
+              () => genTerritoryCount('trick'),
+              () => genTerritoryCount('application')
+          ] },
+        { key: 'territory', title: '[Lv. 3] 승부 결정하기', sub: '집이 더 많은 쪽, 이긴 돌을 맞혀요',
           counts: [5, 15],
           tiers: [() => genTerritoryProblem('simple'), () => genTerritoryProblem('complex')] },
-        { key: 'liberty', title: '[Lv. 3] 활로찾기', sub: '돌이 살아있는 숨구멍을 모두 찾아요',
+        { key: 'liberty', title: '[Lv. 4] 활로찾기', sub: '돌이 살아있는 숨구멍을 모두 찾아요',
           tiers: [() => genLiberty(1), () => genLiberty(2), () => genLiberty(3)] },
-        { key: 'atari', title: '[Lv. 4] 단수의 기술', sub: '상대 돌의 활로를 1개로 줄여요',
+        { key: 'atari', title: '[Lv. 5] 단수의 기술', sub: '상대 돌의 활로를 1개로 줄여요',
           tiers: [() => genAtari(1), () => genAtari(2), () => genAtari(3)] },
-        { key: 'capture', title: '[Lv. 5] 따내기', sub: '단수된 돌을 완전히 잡아요',
+        { key: 'capture', title: '[Lv. 6] 따내기', sub: '단수된 돌을 완전히 잡아요',
           tiers: [() => genCapture(1), () => genCapture(2), () => genCapture(3)] },
-        { key: 'connect', title: '[Lv. 6] 돌의 연결과 끊음', sub: '기본 수읽기: 이어야 할 곳, 끊어야 할 곳',
+        { key: 'connect', title: '[Lv. 7] 돌의 연결과 끊음', sub: '기본 수읽기: 이어야 할 곳, 끊어야 할 곳',
           tiers: [
               () => genConnectCut(1, Math.random() < 0.5 ? 'connect' : 'cut'),
               () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut'),
               () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut')
           ] },
-        { key: 'rescue', title: '[Lv. 7] 기본 살리기', sub: '단수된 우리 돌을 살려서 도망가요',
+        { key: 'rescue', title: '[Lv. 8] 기본 살리기', sub: '단수된 우리 돌을 살려서 도망가요',
           tiers: [() => genRescue(1), () => genRescue(2), () => genRescue(3)] },
-        { key: 'doubleatari', title: '[Lv. 8] 복단수', sub: '한 수로 두 그룹을 동시에 단수쳐요',
+        { key: 'doubleatari', title: '[Lv. 9] 복단수', sub: '한 수로 두 그룹을 동시에 단수쳐요',
           tiers: [() => genDoubleAtari(1,1), () => genDoubleAtari(1,2), () => genDoubleAtari(2,2)] },
-        { key: 'chainatari', title: '[Lv. 9] 연단수', sub: '도망가도 계속 단수가 이어지는 자리',
+        { key: 'chainatari', title: '[Lv. 10] 연단수', sub: '도망가도 계속 단수가 이어지는 자리',
           tiers: [() => genChainAtari(1), () => genChainAtari(1), () => genChainAtari(2)] },
-        { key: 'ladder', title: '[Lv. 10] 축', sub: '가장자리로 몰아서 완전히 잡아요',
+        { key: 'ladder', title: '[Lv. 11] 축', sub: '가장자리로 몰아서 완전히 잡아요',
           tiers: [() => genLadder(1), () => genLadder(1), () => genLadder(2)] },
-        { key: 'basicdeath', title: '[Lv. 11] 기초 사활', sub: '두 집 만들기와 옥집(가짜 집) 구별하기',
+        { key: 'basicdeath', title: '[Lv. 12] 기초 사활', sub: '두 집 만들기와 옥집(가짜 집) 구별하기',
           tiers: [() => genBent3(), () => genStraight3(), () => genTrueFalseEye()] },
-        { key: 'net', title: '[Lv. 12] 장문과 봉쇄', sub: '직접 닿지 않고 상대를 가둬요',
+        { key: 'net', title: '[Lv. 13] 장문과 봉쇄', sub: '직접 닿지 않고 상대를 가둬요',
           tiers: [() => genNet(), () => genNet(), () => genNet()] },
-        { key: 'advanced', title: '[Lv. 13] 고급 전술', sub: '환격 · 먹여치기 · 끼우기',
+        { key: 'advanced', title: '[Lv. 14] 고급 전술', sub: '환격 · 먹여치기 · 끼우기',
           tiers: [() => genSnapback(), () => genFeed(), () => genWedge()] },
-        { key: 'practicaldeath', title: '[Lv. 14] 실전 사활', sub: '궁도를 넓혀서 안전하게 살아요',
+        { key: 'practicaldeath', title: '[Lv. 15] 실전 사활', sub: '궁도를 넓혀서 안전하게 살아요',
           tiers: [() => genLifeCorner(), () => genLifeEdgeStraight3(), () => genLifeEdgeT()] }
     ];
 
@@ -1825,6 +1963,20 @@
         document.getElementById('side-btn-black').classList.remove('selected');
         document.getElementById('side-btn-white').classList.remove('selected');
 
+        const isChooseNumber = currentProblem.type === 'choose_number';
+        const numberControls = document.getElementById('number-choice-controls');
+        numberControls.style.display = isChooseNumber ? 'flex' : 'none';
+        numberControls.innerHTML = '';
+        if (isChooseNumber) {
+            currentProblem.options.forEach(n => {
+                const btn = document.createElement('button');
+                btn.className = 'number-btn';
+                btn.innerText = n + '집';
+                btn.onclick = () => chooseNumber(n, btn);
+                numberControls.appendChild(btn);
+            });
+        }
+
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
                 document.getElementById(`pos-${x}-${y}`).innerHTML = "";
@@ -1844,6 +1996,14 @@
         userMarks = [{ choice: color }];
         document.getElementById('side-btn-black').classList.toggle('selected', color === 'black');
         document.getElementById('side-btn-white').classList.toggle('selected', color === 'white');
+        document.getElementById('message').innerText = "";
+    }
+
+    function chooseNumber(value, btnEl) {
+        if (isProblemSolved) return;
+        userMarks = [{ choice: value }];
+        document.querySelectorAll('#number-choice-controls .number-btn').forEach(b => b.classList.remove('selected'));
+        btnEl.classList.add('selected');
         document.getElementById('message').innerText = "";
     }
 
@@ -1885,7 +2045,7 @@
     function toggleMark(x, y) {
         if (isProblemSolved) return;
         const currentProblem = problemsList[currentProblemIndex];
-        if (currentProblem.type === 'choose_side') return;
+        if (currentProblem.type === 'choose_side' || currentProblem.type === 'choose_number') return;
 
         if (currentProblem.blackStones.some(s => s.x === x && s.y === y)) return;
         if (currentProblem.whiteStones.some(s => s.x === x && s.y === y)) return;
@@ -1923,6 +2083,8 @@
         if (userMarks.length === 0) {
             const emptyMsg = currentProblem.type === 'choose_side'
                 ? "흑과 백 중 이겼다고 생각하는 쪽을 골라보세요!"
+                : currentProblem.type === 'choose_number'
+                ? "몇 집인지 골라보세요!"
                 : "정답이라고 생각하는 곳에 돌을 놓아보세요!";
             showMessage(emptyMsg, false); return;
         }
@@ -1930,6 +2092,8 @@
         let isCorrect = false;
         if (currentProblem.type === "choose_side") {
             isCorrect = userMarks[0].choice === currentProblem.winner;
+        } else if (currentProblem.type === "choose_number") {
+            isCorrect = userMarks[0].choice === currentProblem.answer;
         } else if (currentProblem.type === "mark_multiple") {
             if (userMarks.length !== answers.length) {
                 currentMistakes++; showMessage("숨구멍 갯수가 안맞아요! 다시 세어볼까요?", false); return;
@@ -1948,6 +2112,8 @@
             if (currentProblem.type === "choose_side") {
                 const winnerLabel = currentProblem.winner === 'black' ? '⚫ 흑' : '⚪ 백';
                 showMessage(`정답이에요! ${winnerLabel} 승리! (흑 ${currentProblem.blackScore}집 · 백 ${currentProblem.whiteScore}집) 🎉`, true);
+            } else if (currentProblem.type === "choose_number") {
+                showMessage(`정답이에요! ${currentProblem.answer}집이었어요! 🎉`, true);
             } else {
                 showMessage("참 잘했어요! 완벽해요! 🎉", true);
                 userMarks.forEach(m => {
@@ -1962,6 +2128,8 @@
             currentMistakes++;
             const wrongMsg = currentProblem.type === 'choose_side'
                 ? "다시 세어볼까요? 집을 꼼꼼히 세어보세요!"
+                : currentProblem.type === 'choose_number'
+                ? "다시 세어볼까요? 혹시 안에 다른 색 돌이 숨어있진 않은지도 확인해보세요!"
                 : "아쉽네요. 조금만 더 생각해 볼까요?";
             showMessage(wrongMsg, false);
         }
