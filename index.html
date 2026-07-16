@@ -178,35 +178,41 @@
             font-size: 15px; line-height: 1.5; text-align: left; margin-bottom: 15px; color: #333; font-weight: bold;
         }
 
-        /* 바둑판 UI */
+        /* 바둑판 UI - 기기 화면 폭에 맞춰 커지고 작아지도록 전부 %(비율) 기반으로 배치한다.
+           px로 고정하면 화면이 좁은 폰에서 판이 잘려 나가므로, 컨테이너는 반응형 크기(최대
+           360px, 그 밑으로는 화면 폭에 맞춰 축소)로 두고 내부 요소는 그 컨테이너에 대한
+           %로만 위치를 잡는다 - 그러면 JS에서 화면 크기를 따로 측정할 필요 없이 항상
+           올바른 비율로 그려진다. */
         .board-container {
-            position: relative; width: 360px; height: 360px; background-color: #e5b869;
+            position: relative; width: 100%; max-width: 360px; aspect-ratio: 1 / 1; background-color: #e5b869;
             border: 3px solid #6b4c1e; margin: 0 auto 15px; box-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            box-sizing: border-box;
         }
-        .grid-lines { position: absolute; top: 20px; left: 20px; width: 320px; height: 320px; }
+        .grid-lines { position: absolute; top: 5.5556%; left: 5.5556%; width: 88.8889%; height: 88.8889%; }
         .line-h { position: absolute; left: 0; right: 0; height: 1px; background: #333; }
         .line-v { position: absolute; top: 0; bottom: 0; width: 1px; background: #333; }
         .layer-intersections { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         .intersection {
-            position: absolute; width: 40px; height: 40px; transform: translate(-50%, -50%);
+            position: absolute; width: 11.1111%; height: 11.1111%; transform: translate(-50%, -50%);
             cursor: pointer; display: flex; justify-content: center; align-items: center; border-radius: 50%;
         }
         .intersection:hover { background-color: rgba(255, 255, 255, 0.4); }
 
-        /* 바둑돌 */
-        .stone { width: 32px; height: 32px; border-radius: 50%; box-shadow: 2px 2px 4px rgba(0,0,0,0.4); pointer-events: none; }
-        .stone.black { background: radial-gradient(circle at 10px 10px, #555, #111); }
-        .stone.white { background: radial-gradient(circle at 10px 10px, #fff, #d4d4d4); border: 1px solid #ccc; box-sizing: border-box; }
+        /* 바둑돌: 교차점(.intersection) 크기에 대한 비율로 그려서 판이 커지고 작아져도 같이 스케일된다 */
+        .stone { width: 80%; height: 80%; border-radius: 50%; box-shadow: 2px 2px 4px rgba(0,0,0,0.4); pointer-events: none; }
+        .stone.black { background: radial-gradient(circle at 30% 30%, #555, #111); }
+        .stone.white { background: radial-gradient(circle at 30% 30%, #fff, #d4d4d4); border: 1px solid #ccc; box-sizing: border-box; }
         .stone.preview { box-shadow: 0 0 0 3px #ffeb3b, 2px 2px 4px rgba(0,0,0,0.4); }
 
-        /* 개념 배우기(슬라이드) 미니 바둑판 */
+        /* 개념 배우기(슬라이드) 미니 바둑판 - 메인 바둑판과 같은 방식(% 기반)으로 반응형 처리 */
         .learn-board {
-            position: relative; width: 200px; height: 200px; background-color: #e5b869;
+            position: relative; width: 100%; max-width: 200px; aspect-ratio: 1 / 1; background-color: #e5b869;
             border: 3px solid #6b4c1e; margin: 0 auto 15px; box-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            box-sizing: border-box;
         }
-        .learn-grid { position: absolute; top: 20px; left: 20px; width: 160px; height: 160px; }
+        .learn-grid { position: absolute; top: 10%; left: 10%; width: 80%; height: 80%; }
         .learn-marker {
-            width: 14px; height: 14px; border-radius: 50%; border: 3px dashed #ffb300; box-sizing: border-box;
+            width: 35%; height: 35%; border-radius: 50%; border: 3px dashed #ffb300; box-sizing: border-box;
         }
         .learn-caption {
             background: #f1f8f1; border: 2px solid #c3dec3; padding: 12px; border-radius: 8px;
@@ -881,8 +887,6 @@
     }
 
     const BOARD_SIZE = 9;
-    const CELL_SIZE = 40;
-    const OFFSET = 20;
 
     let problemsList = [];
     let currentProblemIndex = 0;
@@ -2017,7 +2021,6 @@
        개념 배우기 슬라이드 (돌 잡아먹기 등, 5x5 미니 바둑판)
     ========================================================= */
     const LEARN_BOARD_SIZE = 5;
-    const LEARN_CELL = 40;
     let currentLearnSlides = [];
     let currentLearnIdx = 0;
 
@@ -2034,19 +2037,24 @@
         const grid = document.getElementById('learn-grid');
         grid.innerHTML = '';
         for (let i = 0; i < LEARN_BOARD_SIZE; i++) {
-            let h = document.createElement('div'); h.className = 'line-h'; h.style.top = (i * LEARN_CELL) + 'px';
+            let h = document.createElement('div'); h.className = 'line-h'; h.style.top = (i / (LEARN_BOARD_SIZE - 1) * 100) + '%';
             grid.appendChild(h);
-            let v = document.createElement('div'); v.className = 'line-v'; v.style.left = (i * LEARN_CELL) + 'px';
+            let v = document.createElement('div'); v.className = 'line-v'; v.style.left = (i / (LEARN_BOARD_SIZE - 1) * 100) + '%';
             grid.appendChild(v);
         }
-        // #learn-grid 자체가 이미 .learn-board 안에서 (top:20px, left:20px)만큼
-        // 오프셋돼 있으므로, 그 안에 들어가는 선/돌은 여기서 다시 LEARN_OFFSET을
-        // 더하지 않고 그리드 내부 좌표(x*LEARN_CELL)만 써야 격자선과 정렬된다.
+        // #learn-grid 자체가 이미 .learn-board 안에서 %로 오프셋돼 있으므로, 그 안에 들어가는
+        // 선/돌은 여기서 다시 더하지 않고 그리드 내부 좌표(%)만 쓴다. 화면 크기와 상관없이
+        // 항상 같은 비율로 배치되도록 px 대신 %로 위치를 잡는다. cell 자신에게도 한 칸 크기
+        // 만큼 width/height를 %로 줘야, 그 안의 .stone/.learn-marker가 쓰는 %가 (auto 크기가
+        // 아니라) 그 칸 크기를 기준으로 정확히 계산된다.
+        const cellPct = 100 / (LEARN_BOARD_SIZE - 1);
         const place = (x, y, html) => {
             let cell = document.createElement('div');
             cell.style.position = 'absolute';
-            cell.style.left = (x * LEARN_CELL) + 'px';
-            cell.style.top = (y * LEARN_CELL) + 'px';
+            cell.style.left = (x / (LEARN_BOARD_SIZE - 1) * 100) + '%';
+            cell.style.top = (y / (LEARN_BOARD_SIZE - 1) * 100) + '%';
+            cell.style.width = cellPct + '%';
+            cell.style.height = cellPct + '%';
             cell.style.transform = 'translate(-50%, -50%)';
             cell.innerHTML = html;
             grid.appendChild(cell);
@@ -2083,9 +2091,9 @@
         gridLines.innerHTML = ''; intersections.innerHTML = '';
 
         for (let i = 0; i < BOARD_SIZE; i++) {
-            let hLine = document.createElement('div'); hLine.className = 'line-h'; hLine.style.top = (i * CELL_SIZE) + 'px';
+            let hLine = document.createElement('div'); hLine.className = 'line-h'; hLine.style.top = (i / (BOARD_SIZE - 1) * 100) + '%';
             gridLines.appendChild(hLine);
-            let vLine = document.createElement('div'); vLine.className = 'line-v'; vLine.style.left = (i * CELL_SIZE) + 'px';
+            let vLine = document.createElement('div'); vLine.className = 'line-v'; vLine.style.left = (i / (BOARD_SIZE - 1) * 100) + '%';
             gridLines.appendChild(vLine);
         }
 
@@ -2093,7 +2101,7 @@
             for (let x = 0; x < BOARD_SIZE; x++) {
                 let inter = document.createElement('div');
                 inter.className = 'intersection';
-                inter.style.left = (OFFSET + x * CELL_SIZE) + 'px'; inter.style.top = (OFFSET + y * CELL_SIZE) + 'px';
+                inter.style.left = ((x + 0.5) / BOARD_SIZE * 100) + '%'; inter.style.top = ((y + 0.5) / BOARD_SIZE * 100) + '%';
                 inter.id = `pos-${x}-${y}`;
                 inter.onclick = () => toggleMark(x, y);
                 intersections.appendChild(inter);
@@ -2503,16 +2511,16 @@
         gridLines.innerHTML = ''; intersections.innerHTML = '';
 
         for (let i = 0; i < BOARD_SIZE; i++) {
-            let hLine = document.createElement('div'); hLine.className = 'line-h'; hLine.style.top = (i * CELL_SIZE) + 'px';
+            let hLine = document.createElement('div'); hLine.className = 'line-h'; hLine.style.top = (i / (BOARD_SIZE - 1) * 100) + '%';
             gridLines.appendChild(hLine);
-            let vLine = document.createElement('div'); vLine.className = 'line-v'; vLine.style.left = (i * CELL_SIZE) + 'px';
+            let vLine = document.createElement('div'); vLine.className = 'line-v'; vLine.style.left = (i / (BOARD_SIZE - 1) * 100) + '%';
             gridLines.appendChild(vLine);
         }
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
                 let inter = document.createElement('div');
                 inter.className = 'intersection';
-                inter.style.left = (OFFSET + x * CELL_SIZE) + 'px'; inter.style.top = (OFFSET + y * CELL_SIZE) + 'px';
+                inter.style.left = ((x + 0.5) / BOARD_SIZE * 100) + '%'; inter.style.top = ((y + 0.5) / BOARD_SIZE * 100) + '%';
                 inter.id = `play-pos-${x}-${y}`;
                 inter.onclick = () => playCellClick(x, y);
                 intersections.appendChild(inter);
