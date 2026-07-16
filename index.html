@@ -214,6 +214,14 @@
         .learn-marker {
             width: 35%; height: 35%; border-radius: 50%; border: 3px dashed #ffb300; box-sizing: border-box;
         }
+        /* 집으로 세는 칸에 X 표시 - 대국 화면에서 대국종료 시 집에 X 표시하는 것과 같은 표현 */
+        .learn-mark-x { width: 60%; height: 60%; position: relative; }
+        .learn-mark-x::before, .learn-mark-x::after {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 100%; height: 16%;
+            background: #d32f2f; border-radius: 2px;
+        }
+        .learn-mark-x::before { transform: translate(-50%, -50%) rotate(45deg); }
+        .learn-mark-x::after { transform: translate(-50%, -50%) rotate(-45deg); }
         .learn-caption {
             background: #f1f8f1; border: 2px solid #c3dec3; padding: 12px; border-radius: 8px;
             font-size: 14px; line-height: 1.5; text-align: left; margin-bottom: 12px; color: #333;
@@ -1824,45 +1832,45 @@
     const TERRITORY_LEARN_SLIDES = [
         {
             title: '① 집이란?',
-            desc: '흑돌로 완전히 둘러싸인 빈 칸을 "집"이라고 해요. 이 흑집은 1개예요!',
+            desc: '흑돌이 사방을 빙 둘러싸서 백돌이 하나도 들어올 수 없는 빈 칸을 "집"이라고 해요. 빨간 X 표시가 지금 흑집으로 세는 칸이에요. 이 흑집은 1개예요!',
             blackStones: [{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:1,y:2},{x:3,y:2},{x:1,y:3},{x:2,y:3},{x:3,y:3}],
             whiteStones: [],
-            highlights: [{x:2,y:2}]
+            xmarks: [{x:2,y:2}]
         },
         {
             title: '② 집이 여러 칸일 수도 있어요',
-            desc: '둘러싸인 빈 칸이 여러 개면 그 개수만큼 집이에요. 이번엔 4집이에요!',
+            desc: '둘러싸인 빈 칸이 여러 개 붙어 있으면 그 칸 수만큼 집이에요. X 표시된 칸을 하나씩 세어보세요 - 이번엔 4집이에요!',
             blackStones: [{x:0,y:1},{x:0,y:2},{x:3,y:1},{x:3,y:2},{x:1,y:0},{x:2,y:0},{x:1,y:3},{x:2,y:3}],
             whiteStones: [],
-            highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2},{x:2,y:2}]
+            xmarks: [{x:1,y:1},{x:2,y:1},{x:1,y:2},{x:2,y:2}]
         },
         {
             title: '③ 모양은 상관없어요',
-            desc: '집은 네모 모양이 아니어도 괜찮아요. 둘러싸여 있기만 하면 어떤 모양이든 집이에요! (이건 3집)',
+            desc: '집은 네모 모양이 아니어도 괜찮아요. 구불구불한 모양이어도 흑돌이 완전히 둘러싸고 있기만 하면 전부 집이에요. X 표시 3칸 = 3집!',
             blackStones: [{x:0,y:1},{x:1,y:0},{x:3,y:1},{x:2,y:0},{x:2,y:2},{x:0,y:2},{x:1,y:3}],
             whiteStones: [],
-            highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2}]
+            xmarks: [{x:1,y:1},{x:2,y:1},{x:1,y:2}]
         },
         {
             title: '④ 속임수! 담벼락이 끊기면 0집',
-            desc: '자세히 보면 담벼락 한 칸이 비어서 끊겨 있어요! 안쪽이 그 틈을 통해 바깥의 백돌과 이어져 버려서, 이 집은 통째로 0집이 돼요.',
-            blackStones: [{x:0,y:2},{x:3,y:1},{x:3,y:2},{x:1,y:0},{x:2,y:0},{x:1,y:3},{x:2,y:3}],
-            whiteStones: [{x:0,y:0}],
-            highlights: [{x:0,y:1}]
+            desc: '아래쪽 담벼락 한 칸(점선 표시)이 비어서 끊겨 있어요! 그 틈을 통해 안쪽 빈 칸들이 바깥의 백돌과 하나로 이어져 버렸어요. 실제 바둑 규칙에서는 "빈 칸이 백돌에도 닿으면 그 칸은 어느 쪽 집도 아니다"라고 정해져 있어서, 안쪽 4칸 전부 흑집으로 못 세고 0집이 돼요. (흑이 나중에 저 끊긴 자리를 마저 메우면, 백돌을 굳이 잡지 않아도 다시 온전한 4집이 될 수 있어요!)',
+            blackStones: [{x:1,y:0},{x:2,y:0},{x:0,y:1},{x:3,y:1},{x:0,y:2},{x:3,y:2},{x:1,y:3}],
+            whiteStones: [{x:2,y:4}],
+            highlights: [{x:2,y:3}]
         },
         {
             title: '⑤ 담벼락이 안 끊겼다면 바깥 돌은 괜찮아요',
-            desc: '이번엔 담벼락이 완전히 이어져 있어요. 백돌이 바깥에 붙어있어도 안쪽과는 안 닿으니 집 개수는 그대로! 여전히 4집이에요.',
+            desc: '이번엔 담벼락 8칸이 모두 이어져 있어요(끊긴 곳 없음). 백돌이 바깥에 붙어 있어도 안쪽 빈 칸과는 직접 닿지 않으니 집 개수에 영향이 없어요. X 표시 4칸 그대로 4집이에요.',
             blackStones: [{x:0,y:1},{x:0,y:2},{x:3,y:1},{x:3,y:2},{x:1,y:0},{x:2,y:0},{x:1,y:3},{x:2,y:3}],
             whiteStones: [{x:0,y:0}],
-            highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2},{x:2,y:2}]
+            xmarks: [{x:1,y:1},{x:2,y:1},{x:1,y:2},{x:2,y:2}]
         },
         {
             title: '⑥ 이제 퀴즈로 확인해봐요!',
-            desc: '다양한 모양의 집을 보고 몇 집인지 정확히 세어보세요. 담벼락이 끊긴 곳은 없는지도 잘 살펴봐야 해요!',
+            desc: '다양한 모양의 집을 보고 X 표시하듯 하나하나 정확히 세어보세요. 담벼락이 끊긴 곳은 없는지, 안에 다른 색 돌이 숨어있진 않은지도 꼭 확인해야 해요!',
             blackStones: [{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:1,y:2},{x:3,y:2},{x:1,y:3},{x:2,y:3},{x:3,y:3}],
             whiteStones: [],
-            highlights: [{x:2,y:2}]
+            xmarks: [{x:2,y:2}]
         }
     ];
 
@@ -2062,6 +2070,7 @@
         slide.blackStones.forEach(p => place(p.x, p.y, '<div class="stone black"></div>'));
         slide.whiteStones.forEach(p => place(p.x, p.y, '<div class="stone white"></div>'));
         (slide.highlights || []).forEach(p => place(p.x, p.y, '<div class="learn-marker"></div>'));
+        (slide.xmarks || []).forEach(p => place(p.x, p.y, '<div class="learn-mark-x"></div>'));
 
         document.getElementById('learn-title').innerText = slide.title;
         document.getElementById('learn-caption').innerText = slide.desc;
