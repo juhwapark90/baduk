@@ -242,6 +242,42 @@
         .result-msg { font-size: 22px; color: #333; margin-bottom: 20px; }
         .result-btns { display: flex; gap: 10px; width: 100%; }
         .result-btns button { flex: 1; }
+
+        /* 자유 대국(오프라인/AI) 화면 */
+        .play-entry-btn { margin-top: 0; margin-bottom: 12px; background-color: #ff9800; }
+        .play-info-bar, .play-opponent-bar {
+            background: #f1f8f1; border: 2px solid #c3dec3; border-radius: 10px; padding: 10px 12px;
+            display: flex; align-items: center; gap: 10px; margin-bottom: 10px; box-sizing: border-box; width: 100%;
+        }
+        .play-info-bar .ch-info, .play-opponent-bar .op-info { flex: 1; text-align: left; }
+        .play-turn-indicator {
+            font-size: 15px; font-weight: bold; color: #2c5e43; margin-bottom: 10px; text-align: center;
+        }
+        .play-message { font-size: 14px; font-weight: bold; color: #d32f2f; min-height: 20px; margin-bottom: 6px; text-align: center; }
+        .btn-undo, .btn-pass, .btn-takeback { background-color: #78909c; }
+        .btn-end { background-color: #e53935; }
+        .play-mark-x {
+            width: 24px; height: 24px; position: relative; pointer-events: none;
+        }
+        .play-mark-x::before, .play-mark-x::after {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 22px; height: 4px;
+            background: #d32f2f; border-radius: 2px;
+        }
+        .play-mark-x::before { transform: translate(-50%, -50%) rotate(45deg); }
+        .play-mark-x::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5);
+            display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: white; border-radius: 16px; padding: 24px; max-width: 340px; width: 100%;
+            text-align: center; box-sizing: border-box;
+        }
+        .modal-box h2 { margin-bottom: 14px; }
+        .modal-score-row { font-size: 17px; font-weight: bold; margin: 6px 0; color: #333; }
+        .modal-winner-row { font-size: 20px; font-weight: bold; color: #d32f2f; margin: 14px 0; }
     </style>
 </head>
 <body>
@@ -368,6 +404,78 @@
         <div class="result-btns">
             <button class="home-btn" onclick="retryTopic()">🔄 이 주제 다시 도전</button>
             <button class="home-btn" onclick="goHome()">🏠 주제 목록</button>
+        </div>
+    </div>
+</div>
+
+<!-- 바둑 게임 해보기: 모드 선택 -->
+<div id="screen-play-menu" class="screen">
+    <div class="container">
+        <h2>🎮 바둑 게임 해보기</h2>
+        <p class="subtitle">어떻게 대국할지 골라보세요!</p>
+        <button class="home-btn" onclick="openOfflineSetup()">🧑‍🤝‍🧑 오프라인으로 같이 두기</button>
+        <button class="home-btn" onclick="openAiSetup()">🤖 AI와 대국하기</button>
+        <button class="btn btn-back" onclick="goHome()">◀ 홈으로</button>
+    </div>
+</div>
+
+<!-- 오프라인 대국: 상대 이름 입력 -->
+<div id="screen-play-offline-setup" class="screen">
+    <div class="container">
+        <h2>누구랑 대국 하시나요?</h2>
+        <input type="text" id="opponent-name-input" class="cc-input" placeholder="상대방 이름을 입력하세요" maxlength="10">
+        <button class="home-btn" onclick="startOfflineGame()">대국 시작!</button>
+        <button class="btn btn-back" onclick="switchScreen('screen-play-menu')">◀ 뒤로</button>
+    </div>
+</div>
+
+<!-- AI 대국: 난이도 선택 -->
+<div id="screen-play-ai-setup" class="screen">
+    <div class="container">
+        <h2>AI 난이도를 골라보세요</h2>
+        <button class="home-btn" onclick="startAiGame('beginner0')">🐣 왕초보</button>
+        <button class="home-btn" onclick="startAiGame('beginner')">🌱 초보</button>
+        <button class="home-btn" onclick="startAiGame('mid')">⚔️ 중수</button>
+        <button class="home-btn" onclick="startAiGame('high')">🏆 고수</button>
+        <button class="btn btn-back" onclick="switchScreen('screen-play-menu')">◀ 뒤로</button>
+    </div>
+</div>
+
+<!-- 대국 화면 -->
+<div id="screen-play-board" class="screen">
+    <div class="container">
+        <div class="play-info-bar" id="play-info-bar"></div>
+
+        <div class="board-container">
+            <div class="grid-lines" id="play-grid-lines"></div>
+            <div class="layer-intersections" id="play-intersections"></div>
+        </div>
+
+        <div class="play-turn-indicator" id="play-turn-indicator"></div>
+        <div class="play-message" id="play-message"></div>
+
+        <div class="controls">
+            <button class="btn btn-undo" onclick="playUndo()">↩ 다시두기</button>
+            <button class="btn btn-pass" onclick="playPass()">⏭ 차례 넘기기</button>
+        </div>
+        <div class="controls">
+            <button class="btn btn-takeback" onclick="playTakeback()">🔙 무름</button>
+            <button class="btn btn-end" onclick="playEndGame()">🏁 대국 종료</button>
+        </div>
+
+        <div class="play-opponent-bar" id="play-opponent-bar"></div>
+        <button class="btn btn-back" onclick="goHome()">◀ 홈으로</button>
+    </div>
+</div>
+
+<!-- 대국 종료 결과 팝업 -->
+<div id="play-end-popup" class="modal-overlay">
+    <div class="modal-box">
+        <h2>🏁 대국 종료!</h2>
+        <div id="play-end-summary"></div>
+        <div class="result-btns" style="margin-top:16px;">
+            <button class="home-btn" onclick="playRestartSameGame()">🔄 새 대국</button>
+            <button class="home-btn" onclick="closePlayEndPopup()">확인</button>
         </div>
     </div>
 </div>
@@ -526,6 +634,7 @@
         if (!bar) return;
         if (currentUser) {
             bar.innerHTML = `
+                <button class="home-btn play-entry-btn" onclick="openPlayMenu()">🎮 바둑 게임 해보기</button>
                 <div class="user-bar">
                     <div class="user-info">
                         <img src="${currentUser.photoURL || ''}" onerror="this.style.display='none'">
@@ -2164,6 +2273,411 @@
         } else {
             loadProblem();
         }
+    }
+
+    /* =========================================================
+       바둑 게임 해보기 (오프라인 같이두기 / AI 대국) - 실제 대국 엔진
+    ========================================================= */
+    let playBoard = null;          // 9x9 배열, 셀 값: 0(빈칸) | 'black' | 'white'
+    let playTurn = 'black';
+    let playHistory = [];          // 각 수를 두기 "직전" 상태의 스냅샷 목록 (다시두기/무름/차례넘기기 취소용)
+    let playCapturedBy = { black: 0, white: 0 }; // 각 색이 "잡아낸" 상대 돌 개수
+    let playMode = null;            // 'offline' | 'ai'
+    let playOpponentName = '';
+    let playAiDifficulty = null;
+    let playGameEnded = false;     // 대국종료 후에는 새 대국을 시작하기 전까지 착수/되돌리기를 막는다
+    const AI_DIFFICULTY_LABEL = { beginner0: '왕초보', beginner: '초보', mid: '중수', high: '고수' };
+
+    function playInBounds(x, y) { return x >= 0 && x <= 8 && y >= 0 && y <= 8; }
+    function playNeighbors(x, y) {
+        return [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(p => playInBounds(p[0], p[1]));
+    }
+    function makeEmptyPlayBoard() {
+        return Array.from({ length: 9 }, () => Array(9).fill(0));
+    }
+    function clonePlayBoard(board) { return board.map(row => row.slice()); }
+
+    // (x,y) 돌이 속한 무리(연결된 같은 색 돌들)와 그 무리의 활로 개수를 구한다.
+    function getGroupAndLiberties(board, x, y) {
+        const color = board[y][x];
+        if (!color) return null;
+        const visited = new Set([x + '_' + y]);
+        const stack = [[x, y]];
+        const stones = [];
+        const libs = new Set();
+        while (stack.length) {
+            const [cx, cy] = stack.pop();
+            stones.push([cx, cy]);
+            playNeighbors(cx, cy).forEach(([nx, ny]) => {
+                const nc = board[ny][nx];
+                const nk = nx + '_' + ny;
+                if (nc === 0) libs.add(nk);
+                else if (nc === color && !visited.has(nk)) { visited.add(nk); stack.push([nx, ny]); }
+            });
+        }
+        return { stones, liberties: libs.size };
+    }
+
+    // board에 (x,y)에 color 돌을 두려고 시도한다. 이미 돌이 있거나 자충수(자살수)면 실패.
+    // 성공하면 상대 돌 중 활로가 0이 된 무리를 모두 따내고 새 board와 잡은 돌 목록을 돌려준다.
+    function tryPlayMove(board, x, y, color) {
+        if (board[y][x] !== 0) return { ok: false, reason: 'occupied' };
+        const newBoard = clonePlayBoard(board);
+        newBoard[y][x] = color;
+        const opponent = color === 'black' ? 'white' : 'black';
+        const captured = [];
+        const processed = new Set();
+        playNeighbors(x, y).forEach(([nx, ny]) => {
+            const nk = nx + '_' + ny;
+            if (newBoard[ny][nx] === opponent && !processed.has(nk)) {
+                const g = getGroupAndLiberties(newBoard, nx, ny);
+                g.stones.forEach(([sx, sy]) => processed.add(sx + '_' + sy));
+                if (g.liberties === 0) {
+                    g.stones.forEach(([sx, sy]) => { newBoard[sy][sx] = 0; });
+                    captured.push(...g.stones.map(([sx, sy]) => ({ x: sx, y: sy })));
+                }
+            }
+        });
+        const myGroup = getGroupAndLiberties(newBoard, x, y);
+        if (captured.length === 0 && myGroup.liberties === 0) return { ok: false, reason: 'suicide' };
+        return { ok: true, board: newBoard, captured };
+    }
+
+    function listLegalMoves(board, color) {
+        const moves = [];
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                if (board[y][x] !== 0) continue;
+                if (tryPlayMove(board, x, y, color).ok) moves.push({ x, y });
+            }
+        }
+        return moves;
+    }
+
+    // 판을 area 방식(돌 + 집)으로 채점한다. 양쪽 색과 모두 맞닿은 빈 칸(공배)은 어느 쪽 집도 아니다.
+    function computePlayScore(board) {
+        const visited = new Set();
+        let blackTerritory = 0, whiteTerritory = 0;
+        const territoryCells = [];
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                if (board[y][x] !== 0) continue;
+                const k = x + '_' + y;
+                if (visited.has(k)) continue;
+                visited.add(k);
+                const stack = [[x, y]];
+                const region = [[x, y]];
+                let touchesBlack = false, touchesWhite = false;
+                while (stack.length) {
+                    const [cx, cy] = stack.pop();
+                    playNeighbors(cx, cy).forEach(([nx, ny]) => {
+                        const nc = board[ny][nx];
+                        if (nc === 'black') touchesBlack = true;
+                        else if (nc === 'white') touchesWhite = true;
+                        else {
+                            const nk = nx + '_' + ny;
+                            if (!visited.has(nk)) { visited.add(nk); region.push([nx, ny]); stack.push([nx, ny]); }
+                        }
+                    });
+                }
+                if (touchesBlack && !touchesWhite) {
+                    blackTerritory += region.length;
+                    region.forEach(([rx, ry]) => territoryCells.push({ x: rx, y: ry, side: 'black' }));
+                } else if (touchesWhite && !touchesBlack) {
+                    whiteTerritory += region.length;
+                    region.forEach(([rx, ry]) => territoryCells.push({ x: rx, y: ry, side: 'white' }));
+                }
+            }
+        }
+        let blackStones = 0, whiteStones = 0;
+        for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
+            if (board[y][x] === 'black') blackStones++;
+            else if (board[y][x] === 'white') whiteStones++;
+        }
+        return {
+            blackScore: blackStones + blackTerritory,
+            whiteScore: whiteStones + whiteTerritory,
+            territoryCells
+        };
+    }
+
+    /* ---------- 화면 전환 ---------- */
+    function openPlayMenu() {
+        if (!currentUser) { alert('먼저 구글 로그인을 해주세요!'); return; }
+        if (!getActiveCharacter()) { openCharacterSelect(); return; }
+        switchScreen('screen-play-menu');
+    }
+    function openOfflineSetup() {
+        document.getElementById('opponent-name-input').value = '';
+        switchScreen('screen-play-offline-setup');
+    }
+    function openAiSetup() { switchScreen('screen-play-ai-setup'); }
+
+    function resetPlayState() {
+        playBoard = makeEmptyPlayBoard();
+        playTurn = 'black';
+        playHistory = [];
+        playCapturedBy = { black: 0, white: 0 };
+        playGameEnded = false;
+        document.getElementById('play-message').innerText = '';
+    }
+
+    function startOfflineGame() {
+        const nameInput = document.getElementById('opponent-name-input').value.trim();
+        playMode = 'offline';
+        playOpponentName = nameInput || '상대방';
+        playAiDifficulty = null;
+        resetPlayState();
+        initPlayBoard();
+        switchScreen('screen-play-board');
+    }
+
+    function startAiGame(difficulty) {
+        playMode = 'ai';
+        playAiDifficulty = difficulty;
+        playOpponentName = '';
+        resetPlayState();
+        initPlayBoard();
+        switchScreen('screen-play-board');
+    }
+
+    function playRestartSameGame() {
+        closePlayEndPopup();
+        resetPlayState();
+        initPlayBoard();
+    }
+
+    /* ---------- 바둑판 렌더링 ---------- */
+    function initPlayBoard() {
+        const gridLines = document.getElementById('play-grid-lines');
+        const intersections = document.getElementById('play-intersections');
+        gridLines.innerHTML = ''; intersections.innerHTML = '';
+
+        for (let i = 0; i < BOARD_SIZE; i++) {
+            let hLine = document.createElement('div'); hLine.className = 'line-h'; hLine.style.top = (i * CELL_SIZE) + 'px';
+            gridLines.appendChild(hLine);
+            let vLine = document.createElement('div'); vLine.className = 'line-v'; vLine.style.left = (i * CELL_SIZE) + 'px';
+            gridLines.appendChild(vLine);
+        }
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                let inter = document.createElement('div');
+                inter.className = 'intersection';
+                inter.style.left = (OFFSET + x * CELL_SIZE) + 'px'; inter.style.top = (OFFSET + y * CELL_SIZE) + 'px';
+                inter.id = `play-pos-${x}-${y}`;
+                inter.onclick = () => playCellClick(x, y);
+                intersections.appendChild(inter);
+            }
+        }
+        renderPlayBars();
+        renderPlayBoardStones();
+        renderPlayTurnIndicator();
+    }
+
+    function renderPlayBars() {
+        const character = getActiveCharacter();
+        const infoBar = document.getElementById('play-info-bar');
+        if (character) {
+            const level = characterLevel(character);
+            infoBar.innerHTML = `
+                ${avatarHtml(character, 32)}
+                <div class="ch-info">
+                    <div class="ch-name-row">${character.name} <span class="level-badge">Lv.${level}</span></div>
+                    <div class="ch-points-row">💰 ${walletBalance(character)}P</div>
+                </div>`;
+        } else {
+            infoBar.innerHTML = '';
+        }
+
+        const opponentBar = document.getElementById('play-opponent-bar');
+        const label = playMode === 'ai'
+            ? `🤖 AI (${AI_DIFFICULTY_LABEL[playAiDifficulty] || ''})`
+            : `🧑‍🤝‍🧑 ${playOpponentName}`;
+        opponentBar.innerHTML = `<div class="op-info">${label}</div>`;
+    }
+
+    function renderPlayBoardStones() {
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 9; x++) {
+                const cell = document.getElementById(`play-pos-${x}-${y}`);
+                const v = playBoard[y][x];
+                cell.innerHTML = v ? `<div class="stone ${v}"></div>` : '';
+            }
+        }
+    }
+
+    function renderPlayTurnIndicator() {
+        const el = document.getElementById('play-turn-indicator');
+        const character = getActiveCharacter();
+        const blackLabel = character ? character.name : '흑';
+        const whiteLabel = playMode === 'ai'
+            ? `AI(${AI_DIFFICULTY_LABEL[playAiDifficulty] || ''})`
+            : (playOpponentName || '백');
+        el.innerText = playTurn === 'black'
+            ? `⚫ ${blackLabel}님 차례예요!`
+            : `⚪ ${whiteLabel} 차례예요!`;
+    }
+
+    /* ---------- 착수 / 컨트롤 ---------- */
+    function playCellClick(x, y) {
+        if (playGameEnded) return; // 대국이 끝난 뒤에는 판을 건드릴 수 없다
+        if (playMode === 'ai' && playTurn !== 'black') return; // AI 차례에는 사람이 대신 두지 못하게 막는다
+        attemptPlayMove(x, y);
+    }
+
+    function attemptPlayMove(x, y) {
+        const result = tryPlayMove(playBoard, x, y, playTurn);
+        document.getElementById('play-message').innerText = '';
+        if (!result.ok) {
+            document.getElementById('play-message').innerText =
+                result.reason === 'occupied' ? '이미 돌이 있어요!' : '그 자리에는 둘 수 없어요 (자충수)!';
+            return;
+        }
+        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy } });
+        playBoard = result.board;
+        if (result.captured.length > 0) playCapturedBy[playTurn] += result.captured.length;
+        playStoneSound();
+        playTurn = playTurn === 'black' ? 'white' : 'black';
+        renderPlayBoardStones();
+        renderPlayTurnIndicator();
+
+        if (playMode === 'ai' && playTurn === 'white') {
+            setTimeout(aiTakeTurn, 450);
+        }
+    }
+
+    // 다시두기: 바로 직전 한 수만 되돌린다 (실수로 뒀을 때 대비).
+    function playUndo() {
+        if (playGameEnded) return;
+        if (playHistory.length === 0) { document.getElementById('play-message').innerText = '되돌릴 수 있는 수가 없어요!'; return; }
+        const prev = playHistory.pop();
+        playBoard = prev.board; playTurn = prev.turn; playCapturedBy = prev.capturedBy;
+        document.getElementById('play-message').innerText = '';
+        renderPlayBoardStones();
+        renderPlayTurnIndicator();
+    }
+
+    // 무름: 방금 둔 수와 그 이전 수까지, 두 수를 함께 되돌린다.
+    function playTakeback() {
+        if (playGameEnded) return;
+        if (playHistory.length === 0) { document.getElementById('play-message').innerText = '무를 수 있는 수가 없어요!'; return; }
+        const first = playHistory.pop();
+        const second = playHistory.length > 0 ? playHistory.pop() : first;
+        playBoard = second.board; playTurn = second.turn; playCapturedBy = second.capturedBy;
+        document.getElementById('play-message').innerText = '';
+        renderPlayBoardStones();
+        renderPlayTurnIndicator();
+    }
+
+    function playPass() {
+        if (playGameEnded) return;
+        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy } });
+        playTurn = playTurn === 'black' ? 'white' : 'black';
+        document.getElementById('play-message').innerText = '';
+        renderPlayTurnIndicator();
+        if (playMode === 'ai' && playTurn === 'white') {
+            setTimeout(aiTakeTurn, 450);
+        }
+    }
+
+    function playEndGame() {
+        playGameEnded = true;
+        const score = computePlayScore(playBoard);
+        score.territoryCells.forEach(({ x, y }) => {
+            document.getElementById(`play-pos-${x}-${y}`).innerHTML = '<div class="play-mark-x"></div>';
+        });
+
+        const character = getActiveCharacter();
+        const blackLabel = character ? character.name : '흑';
+        const whiteLabel = playMode === 'ai'
+            ? `AI(${AI_DIFFICULTY_LABEL[playAiDifficulty] || ''})`
+            : (playOpponentName || '백');
+        const diff = Math.abs(score.blackScore - score.whiteScore);
+        const winnerText = score.blackScore === score.whiteScore
+            ? '무승부예요!'
+            : score.blackScore > score.whiteScore
+            ? `⚫ ${blackLabel}님이 ${diff}집 차이로 승리!`
+            : `⚪ ${whiteLabel}이(가) ${diff}집 차이로 승리!`;
+
+        document.getElementById('play-end-summary').innerHTML = `
+            <div class="modal-score-row">⚫ ${blackLabel}: ${score.blackScore}집</div>
+            <div class="modal-score-row">⚪ ${whiteLabel}: ${score.whiteScore}집</div>
+            <div class="modal-winner-row">${winnerText}</div>
+        `;
+        document.getElementById('play-end-popup').classList.add('active');
+    }
+
+    function closePlayEndPopup() {
+        document.getElementById('play-end-popup').classList.remove('active');
+    }
+
+    /* ---------- AI (왕초보 / 초보 / 중수 / 고수) ---------- */
+    // 후보 수 하나를 평가해서 점수를 매긴다. 점수가 높을수록 AI가 선호하는 수.
+    function evaluateAiMove(board, x, y, color, difficulty) {
+        const opponent = color === 'black' ? 'white' : 'black';
+        const result = tryPlayMove(board, x, y, color);
+        let score = randInt(0, 2);
+        score += result.captured.length * 10;
+
+        const myGroup = getGroupAndLiberties(result.board, x, y);
+        score += Math.min(myGroup.liberties, 4);
+        if (myGroup.liberties === 1) score -= 8; // 스스로 단수에 놓이는 수는 피한다
+
+        // 이 수로 상대 무리를 단수로 몰았다면 가산점
+        const processedOpp = new Set();
+        playNeighbors(x, y).forEach(([nx, ny]) => {
+            const nk = nx + '_' + ny;
+            if (result.board[ny][nx] === opponent && !processedOpp.has(nk)) {
+                const g = getGroupAndLiberties(result.board, nx, ny);
+                g.stones.forEach(([sx, sy]) => processedOpp.add(sx + '_' + sy));
+                if (g.liberties === 1) score += 5;
+            }
+        });
+
+        if (difficulty === 'high') {
+            // 고수는 한 수 더 내다본다: 이 수를 둔 뒤 상대가 무언가를 잡아갈 수 있는지 확인해서 감점한다.
+            let worstOpponentCapture = 0;
+            listLegalMoves(result.board, opponent).forEach(m => {
+                const reply = tryPlayMove(result.board, m.x, m.y, opponent);
+                if (reply.ok) worstOpponentCapture = Math.max(worstOpponentCapture, reply.captured.length);
+            });
+            score -= worstOpponentCapture * 9;
+        }
+        return score;
+    }
+
+    function aiChooseMove(board, color, difficulty) {
+        const moves = listLegalMoves(board, color);
+        if (moves.length === 0) return null;
+
+        if (difficulty === 'beginner0') {
+            return moves[randInt(0, moves.length - 1)];
+        }
+        if (difficulty === 'beginner') {
+            const capturing = moves.filter(m => tryPlayMove(board, m.x, m.y, color).captured.length > 0);
+            const safe = moves.filter(m => {
+                const r = tryPlayMove(board, m.x, m.y, color);
+                const g = getGroupAndLiberties(r.board, m.x, m.y);
+                return g.liberties > 1 || r.captured.length > 0;
+            });
+            const pool = capturing.length > 0 ? capturing : (safe.length > 0 ? safe : moves);
+            return pool[randInt(0, pool.length - 1)];
+        }
+        // 중수 / 고수: 모든 후보 수를 평가해서 가장 높은 점수의 수를 고른다 (동점이면 무작위).
+        let best = [], bestScore = -Infinity;
+        shuffle(moves).forEach(m => {
+            const s = evaluateAiMove(board, m.x, m.y, color, difficulty);
+            if (s > bestScore) { bestScore = s; best = [m]; }
+            else if (s === bestScore) best.push(m);
+        });
+        return best[randInt(0, best.length - 1)];
+    }
+
+    function aiTakeTurn() {
+        if (playGameEnded || playMode !== 'ai' || playTurn !== 'white') return;
+        const move = aiChooseMove(playBoard, 'white', playAiDifficulty);
+        if (!move) { playPass(); return; }
+        attemptPlayMove(move.x, move.y);
     }
 
     buildHomeScreen();
