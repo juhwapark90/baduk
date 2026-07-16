@@ -199,6 +199,20 @@
         .stone.white { background: radial-gradient(circle at 10px 10px, #fff, #d4d4d4); border: 1px solid #ccc; box-sizing: border-box; }
         .stone.preview { box-shadow: 0 0 0 3px #ffeb3b, 2px 2px 4px rgba(0,0,0,0.4); }
 
+        /* 개념 배우기(슬라이드) 미니 바둑판 */
+        .learn-board {
+            position: relative; width: 200px; height: 200px; background-color: #e5b869;
+            border: 3px solid #6b4c1e; margin: 0 auto 15px; box-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+        }
+        .learn-grid { position: absolute; top: 20px; left: 20px; width: 160px; height: 160px; }
+        .learn-marker {
+            width: 14px; height: 14px; border-radius: 50%; border: 3px dashed #ffb300; box-sizing: border-box;
+        }
+        .learn-caption {
+            background: #f1f8f1; border: 2px solid #c3dec3; padding: 12px; border-radius: 8px;
+            font-size: 14px; line-height: 1.5; text-align: left; margin-bottom: 12px; color: #333;
+        }
+
         .controls { display: flex; justify-content: center; gap: 10px; margin-top: 5px; }
         .btn { padding: 12px 24px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; font-weight: bold; color: white; transition: 0.2s; }
         .btn-check { background-color: #4CAF50; }
@@ -273,6 +287,32 @@
         <div class="shop-wallet-row">💰 <span id="shop-wallet">0P</span></div>
         <div id="shop-item-list"></div>
         <button class="btn btn-back" onclick="switchScreen('screen-home')">◀ 홈으로</button>
+    </div>
+</div>
+
+<!-- 주제 선택형 소개 화면 (개념 배우기 / 퀴즈 풀기 중 선택) -->
+<div id="screen-topic-intro" class="screen">
+    <div class="container">
+        <h2 id="topic-intro-title">주제</h2>
+        <p class="subtitle" id="topic-intro-sub"></p>
+        <button class="home-btn" onclick="openLearnSlides()">📖 돌을 잡아먹는 개념 배우기</button>
+        <button class="home-btn" onclick="beginTopicQuiz(currentTopicKey)">✏️ 돌을 잡아먹는 곳은? 퀴즈 풀기</button>
+        <button class="btn btn-back" onclick="goHome()">◀ 주제 목록으로</button>
+    </div>
+</div>
+
+<!-- 개념 배우기 슬라이드 화면 -->
+<div id="screen-learn" class="screen">
+    <div class="container">
+        <h2 id="learn-title">개념 배우기</h2>
+        <div class="progress-text" id="learn-progress"></div>
+        <div class="learn-board"><div class="learn-grid" id="learn-grid"></div></div>
+        <div class="learn-caption" id="learn-caption"></div>
+        <div class="controls">
+            <button class="btn btn-back" id="learn-prev-btn" onclick="learnPrev()">◀ 이전</button>
+            <button class="btn btn-check" id="learn-next-btn" onclick="learnNext()">다음 ▶</button>
+        </div>
+        <button class="btn btn-back" onclick="switchScreen('screen-topic-intro')">◀ 뒤로</button>
     </div>
 </div>
 
@@ -1437,37 +1477,77 @@
         return result;
     }
 
+    // 돌을 잡아먹는 개념(활로 → 단수 → 따냄)을 보여주는 슬라이드. 5x5 미니 바둑판
+    // 좌표(0~4)를 쓰며, highlights는 "여기가 활로예요/여기를 막아야 해요"를 점선 동그라미로 표시한다.
+    const CATCH_LEARN_SLIDES = [
+        {
+            title: '① 활로(숨구멍)란?',
+            desc: '바둑돌은 상하좌우로 맞닿은 빈 칸이 "활로(숨구멍)"예요. 이 백돌은 활로가 4개 있어요.',
+            blackStones: [], whiteStones: [{x:2,y:2}],
+            highlights: [{x:1,y:2},{x:3,y:2},{x:2,y:1},{x:2,y:3}]
+        },
+        {
+            title: '② 단수 (활로가 1개)',
+            desc: '흑돌 3개가 활로 3개를 막았어요. 이제 활로가 1개만 남아서 "단수" 상태가 됐어요!',
+            blackStones: [{x:1,y:2},{x:3,y:2},{x:2,y:1}], whiteStones: [{x:2,y:2}],
+            highlights: [{x:2,y:3}]
+        },
+        {
+            title: '③ 마지막 활로를 막으면 잡아요!',
+            desc: '마지막 남은 활로에 흑돌을 놓으면, 백돌은 더 이상 갈 곳이 없어서 판에서 사라져요. 이걸 "따낸다"고 해요!',
+            blackStones: [{x:1,y:2},{x:3,y:2},{x:2,y:1},{x:2,y:3}], whiteStones: [],
+            highlights: [{x:2,y:2}]
+        },
+        {
+            title: '④ 여러 개로 이어진 돌도 똑같아요',
+            desc: '백돌 2개가 붙어있으면 활로도 6개예요. 이 6개를 모두 막아야 한꺼번에 잡을 수 있어요.',
+            blackStones: [{x:1,y:2},{x:2,y:1},{x:3,y:1},{x:4,y:2},{x:2,y:3},{x:3,y:3}],
+            whiteStones: [{x:2,y:2},{x:3,y:2}],
+            highlights: []
+        },
+        {
+            title: '⑤ 이제 퀴즈로 연습해봐요!',
+            desc: '다양한 상황에서 단수 상태의 백돌을 발견하고, 마지막 활로에 흑돌을 놓아 잡아보세요!',
+            blackStones: [{x:1,y:2},{x:2,y:1},{x:3,y:2}], whiteStones: [{x:2,y:2}],
+            highlights: [{x:2,y:3}]
+        }
+    ];
+
     const TOPICS = [
-        { key: 'territory', title: '[Lv. 1] 승부 결정하기', sub: '집이 더 많은 쪽, 이긴 돌을 맞혀요',
+        { key: 'catchbasics', title: '[Lv. 1] 돌 잡아먹기', sub: '단수된 돌을 잡는 원리를 배우고 연습해요',
+          learnSlides: CATCH_LEARN_SLIDES,
+          counts: [4, 4, 3],
+          tiers: [() => genCapture(1), () => genCapture(2), () => genCapture(3)] },
+        { key: 'territory', title: '[Lv. 2] 승부 결정하기', sub: '집이 더 많은 쪽, 이긴 돌을 맞혀요',
           counts: [5, 15],
           tiers: [() => genTerritoryProblem('simple'), () => genTerritoryProblem('complex')] },
-        { key: 'liberty', title: '[Lv. 2] 활로찾기', sub: '돌이 살아있는 숨구멍을 모두 찾아요',
+        { key: 'liberty', title: '[Lv. 3] 활로찾기', sub: '돌이 살아있는 숨구멍을 모두 찾아요',
           tiers: [() => genLiberty(1), () => genLiberty(2), () => genLiberty(3)] },
-        { key: 'atari', title: '[Lv. 3] 단수의 기술', sub: '상대 돌의 활로를 1개로 줄여요',
+        { key: 'atari', title: '[Lv. 4] 단수의 기술', sub: '상대 돌의 활로를 1개로 줄여요',
           tiers: [() => genAtari(1), () => genAtari(2), () => genAtari(3)] },
-        { key: 'capture', title: '[Lv. 4] 따내기', sub: '단수된 돌을 완전히 잡아요',
+        { key: 'capture', title: '[Lv. 5] 따내기', sub: '단수된 돌을 완전히 잡아요',
           tiers: [() => genCapture(1), () => genCapture(2), () => genCapture(3)] },
-        { key: 'connect', title: '[Lv. 5] 돌의 연결과 끊음', sub: '기본 수읽기: 이어야 할 곳, 끊어야 할 곳',
+        { key: 'connect', title: '[Lv. 6] 돌의 연결과 끊음', sub: '기본 수읽기: 이어야 할 곳, 끊어야 할 곳',
           tiers: [
               () => genConnectCut(1, Math.random() < 0.5 ? 'connect' : 'cut'),
               () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut'),
               () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut')
           ] },
-        { key: 'rescue', title: '[Lv. 6] 기본 살리기', sub: '단수된 우리 돌을 살려서 도망가요',
+        { key: 'rescue', title: '[Lv. 7] 기본 살리기', sub: '단수된 우리 돌을 살려서 도망가요',
           tiers: [() => genRescue(1), () => genRescue(2), () => genRescue(3)] },
-        { key: 'doubleatari', title: '[Lv. 7] 복단수', sub: '한 수로 두 그룹을 동시에 단수쳐요',
+        { key: 'doubleatari', title: '[Lv. 8] 복단수', sub: '한 수로 두 그룹을 동시에 단수쳐요',
           tiers: [() => genDoubleAtari(1,1), () => genDoubleAtari(1,2), () => genDoubleAtari(2,2)] },
-        { key: 'chainatari', title: '[Lv. 8] 연단수', sub: '도망가도 계속 단수가 이어지는 자리',
+        { key: 'chainatari', title: '[Lv. 9] 연단수', sub: '도망가도 계속 단수가 이어지는 자리',
           tiers: [() => genChainAtari(1), () => genChainAtari(1), () => genChainAtari(2)] },
-        { key: 'ladder', title: '[Lv. 9] 축', sub: '가장자리로 몰아서 완전히 잡아요',
+        { key: 'ladder', title: '[Lv. 10] 축', sub: '가장자리로 몰아서 완전히 잡아요',
           tiers: [() => genLadder(1), () => genLadder(1), () => genLadder(2)] },
-        { key: 'basicdeath', title: '[Lv. 10] 기초 사활', sub: '두 집 만들기와 옥집(가짜 집) 구별하기',
+        { key: 'basicdeath', title: '[Lv. 11] 기초 사활', sub: '두 집 만들기와 옥집(가짜 집) 구별하기',
           tiers: [() => genBent3(), () => genStraight3(), () => genTrueFalseEye()] },
-        { key: 'net', title: '[Lv. 11] 장문과 봉쇄', sub: '직접 닿지 않고 상대를 가둬요',
+        { key: 'net', title: '[Lv. 12] 장문과 봉쇄', sub: '직접 닿지 않고 상대를 가둬요',
           tiers: [() => genNet(), () => genNet(), () => genNet()] },
-        { key: 'advanced', title: '[Lv. 12] 고급 전술', sub: '환격 · 먹여치기 · 끼우기',
+        { key: 'advanced', title: '[Lv. 13] 고급 전술', sub: '환격 · 먹여치기 · 끼우기',
           tiers: [() => genSnapback(), () => genFeed(), () => genWedge()] },
-        { key: 'practicaldeath', title: '[Lv. 13] 실전 사활', sub: '궁도를 넓혀서 안전하게 살아요',
+        { key: 'practicaldeath', title: '[Lv. 14] 실전 사활', sub: '궁도를 넓혀서 안전하게 살아요',
           tiers: [() => genLifeCorner(), () => genLifeEdgeStraight3(), () => genLifeEdgeT()] }
     ];
 
@@ -1502,12 +1582,14 @@
                     <span class="topic-progress-text">${points}/${SCORE_MAX}점 (최고 기록)${remain}</span>`;
             }
 
+            let quizCount = (t.counts || [7, 7, 6]).reduce((a, b) => a + b, 0);
+            let modeNote = t.learnSlides ? `개념 배우기 + 퀴즈 ${quizCount}문제` : `랜덤 ${quizCount}문제`;
             btn.innerHTML = `
                 <div class="topic-top-row">
                     <span>${lockIcon}${t.title}</span>
                     ${badge}
                 </div>
-                <span class="desc-line">${t.sub} · 랜덤 20문제</span>
+                <span class="desc-line">${t.sub} · ${modeNote}</span>
                 ${progressLine}
             `;
             btn.onclick = () => startTopic(t.key);
@@ -1534,6 +1616,18 @@
         if (!isTopicUnlocked(idx, character)) { alert('이전 레벨을 먼저 클리어해야 열려요!'); return; }
         currentTopicKey = topicKey;
         let topic = TOPICS.find(t => t.key === topicKey);
+        if (topic.learnSlides) {
+            document.getElementById('topic-intro-title').innerText = topic.title;
+            document.getElementById('topic-intro-sub').innerText = topic.sub;
+            switchScreen('screen-topic-intro');
+        } else {
+            beginTopicQuiz(topicKey);
+        }
+    }
+
+    function beginTopicQuiz(topicKey) {
+        currentTopicKey = topicKey;
+        let topic = TOPICS.find(t => t.key === topicKey);
         problemsList = generateTopicSet(topic.tiers, topic.counts);
         currentProblemIndex = 0;
         totalScore = 0;
@@ -1542,7 +1636,70 @@
         switchScreen('screen-game');
     }
 
-    function retryTopic() { startTopic(currentTopicKey); }
+    function retryTopic() { beginTopicQuiz(currentTopicKey); }
+
+    /* =========================================================
+       개념 배우기 슬라이드 (돌 잡아먹기 등, 5x5 미니 바둑판)
+    ========================================================= */
+    const LEARN_BOARD_SIZE = 5;
+    const LEARN_CELL = 40;
+    let currentLearnSlides = [];
+    let currentLearnIdx = 0;
+
+    function openLearnSlides() {
+        const topic = TOPICS.find(t => t.key === currentTopicKey);
+        currentLearnSlides = topic.learnSlides;
+        currentLearnIdx = 0;
+        renderLearnSlide();
+        switchScreen('screen-learn');
+    }
+
+    function renderLearnSlide() {
+        const slide = currentLearnSlides[currentLearnIdx];
+        const grid = document.getElementById('learn-grid');
+        grid.innerHTML = '';
+        for (let i = 0; i < LEARN_BOARD_SIZE; i++) {
+            let h = document.createElement('div'); h.className = 'line-h'; h.style.top = (i * LEARN_CELL) + 'px';
+            grid.appendChild(h);
+            let v = document.createElement('div'); v.className = 'line-v'; v.style.left = (i * LEARN_CELL) + 'px';
+            grid.appendChild(v);
+        }
+        // #learn-grid 자체가 이미 .learn-board 안에서 (top:20px, left:20px)만큼
+        // 오프셋돼 있으므로, 그 안에 들어가는 선/돌은 여기서 다시 LEARN_OFFSET을
+        // 더하지 않고 그리드 내부 좌표(x*LEARN_CELL)만 써야 격자선과 정렬된다.
+        const place = (x, y, html) => {
+            let cell = document.createElement('div');
+            cell.style.position = 'absolute';
+            cell.style.left = (x * LEARN_CELL) + 'px';
+            cell.style.top = (y * LEARN_CELL) + 'px';
+            cell.style.transform = 'translate(-50%, -50%)';
+            cell.innerHTML = html;
+            grid.appendChild(cell);
+        };
+        slide.blackStones.forEach(p => place(p.x, p.y, '<div class="stone black"></div>'));
+        slide.whiteStones.forEach(p => place(p.x, p.y, '<div class="stone white"></div>'));
+        (slide.highlights || []).forEach(p => place(p.x, p.y, '<div class="learn-marker"></div>'));
+
+        document.getElementById('learn-title').innerText = slide.title;
+        document.getElementById('learn-caption').innerText = slide.desc;
+        document.getElementById('learn-progress').innerText = `${currentLearnIdx + 1} / ${currentLearnSlides.length}`;
+        document.getElementById('learn-prev-btn').style.visibility = currentLearnIdx === 0 ? 'hidden' : 'visible';
+        document.getElementById('learn-next-btn').innerText =
+            currentLearnIdx === currentLearnSlides.length - 1 ? '퀴즈 풀러가기 ▶' : '다음 ▶';
+    }
+
+    function learnPrev() {
+        if (currentLearnIdx > 0) { currentLearnIdx--; renderLearnSlide(); }
+    }
+
+    function learnNext() {
+        if (currentLearnIdx < currentLearnSlides.length - 1) {
+            currentLearnIdx++;
+            renderLearnSlide();
+        } else {
+            beginTopicQuiz(currentTopicKey);
+        }
+    }
 
     function initBoard() {
         const gridLines = document.getElementById('grid-lines');
@@ -1611,6 +1768,41 @@
         document.getElementById('message').innerText = "";
     }
 
+    // 바둑돌을 놓을 때 나는 "딱" 소리. 외부 오디오 파일 없이 Web Audio API로 짧은
+    // 노이즈 버스트를 만들어 재생한다(오프라인에서도 동작, 별도 리소스 불필요).
+    let audioCtx = null;
+    function playStoneSound() {
+        try {
+            audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const duration = 0.045;
+            const sampleRate = audioCtx.sampleRate;
+            const buffer = audioCtx.createBuffer(1, Math.floor(sampleRate * duration), sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                const t = i / data.length;
+                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 6);
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const bandpass = audioCtx.createBiquadFilter();
+            bandpass.type = 'bandpass';
+            bandpass.frequency.value = 2200;
+            bandpass.Q.value = 0.7;
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.9, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+            noise.connect(bandpass).connect(gain).connect(audioCtx.destination);
+            noise.start();
+            noise.stop(audioCtx.currentTime + duration);
+        } catch (e) { /* 오디오를 지원하지 않는 환경에서는 조용히 무시 */ }
+    }
+
     function toggleMark(x, y) {
         if (isProblemSolved) return;
         const currentProblem = problemsList[currentProblemIndex];
@@ -1629,6 +1821,7 @@
             if (currentProblem.type === "mark_multiple") {
                 userMarks.push({x, y});
                 cell.innerHTML = `<div class="stone white preview"></div>`;
+                playStoneSound();
             } else if (currentProblem.type === "play_single") {
                 if (userMarks.length > 0) {
                     const prev = userMarks[0];
@@ -1637,6 +1830,7 @@
                 }
                 userMarks.push({x, y});
                 cell.innerHTML = `<div class="stone black preview"></div>`;
+                playStoneSound();
             }
         }
         document.getElementById('message').innerText = "";
