@@ -1230,10 +1230,10 @@
             '바둑이 끝났어요! 누가 이겼을까요? 집이 훨씬 많은 쪽의 돌을 골라보세요!');
     }
 
-    // 흑/백 각각 2~3개의 씨앗점을 뿌려 보로노이 방식으로 구역을 나누되, 구역마다 씨앗에서
+    // 흑/백 각각 3~4개의 씨앗점을 뿌려 보로노이 방식으로 구역을 나누되, 구역마다 씨앗에서
     // 가까운 몇 칸만 실제 집(빈 칸)으로 남기고 나머지 내부 칸은 모두 돌로 채운다. 이러면
     // 판 전체가 돌로 빽빽하고 군데군데 작은 집만 남은 "실제 종국" 모습이 되고, 씨앗이
-    // 여러 개라서 흑/백 모두 자연스럽게 여러 채로 나뉜 집을 갖게 된다.
+    // 여러 개라서 흑/백 모두 자연스럽게 3채 이상으로 나뉜 집을 갖게 된다.
     // (구역을 통째로 집으로 남기면 빈 공간이 너무 커져서 "게임 중간에 집계하는" 느낌이
     // 나기 때문에, 구역 크기와 상관없이 집 개수를 몇 칸으로 제한하는 방식으로 바꿨다.)
     function genTerritoryComplex() {
@@ -1259,8 +1259,8 @@
                     added++;
                 }
             };
-            addSeeds('A', randInt(2, 3));
-            addSeeds('B', randInt(2, 3));
+            addSeeds('A', randInt(3, 4));
+            addSeeds('B', randInt(3, 4));
             if (!seeds.some(s => s.side === 'A') || !seeds.some(s => s.side === 'B')) continue;
 
             const ownerMap = {}, zoneMap = {};
@@ -1298,8 +1298,8 @@
                 cells.slice(0, cap).forEach(c => territoryKeys.add(c.k));
             });
 
-            // 한쪽 색의 집이 사실상 한 군데로만 뭉쳐 있으면 "여러 채" 조건에 안 맞으니
-            // 버리고 다시 만든다.
+            // 실전 종국처럼 보이려면 흑/백 모두 집이 최소 3채는 되어야 하므로,
+            // 그에 못 미치면 버리고 다시 만든다.
             const housesOf = (side) => {
                 const cells = [];
                 territoryKeys.forEach(k => { if (ownerMap[k] === side) cells.push(k); });
@@ -1322,7 +1322,7 @@
                 });
                 return houses;
             };
-            if (housesOf('A') < 2 || housesOf('B') < 2) continue;
+            if (housesOf('A') < 3 || housesOf('B') < 3) continue;
 
             const built = buildStonesAndTerritory(ownerMap, territoryKeys);
             if (!built) continue;
