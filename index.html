@@ -879,8 +879,10 @@
     /* =========================================================
        ③ 따내기
     ========================================================= */
-    function genCapture(size) {
-        let r = makeGroupWithLiberties(size, 1);
+    // region을 주면 그 범위 안에서만 돌 무리를 만든다(구석/끝선 문제에 사용).
+    // 안 주면 기존처럼 판 가운데 쪽(1~7행/열)에서 만든다.
+    function genCapture(size, region) {
+        let r = makeGroupWithLiberties(size, 1, region);
         if (!r) return genCapture(1);
         return {
             type: 'play_single',
@@ -889,6 +891,33 @@
             answers: toObjArr(r.keep),
             desc: '단수에 몰린 흰 돌을 따낼 수 있는 자리를 찾아 흑돌을 놓아보세요!'
         };
+    }
+
+    // 9x9 판의 네 구석(모서리) 중 하나를 무작위로 고른다. region은 makeGroupWithLiberties가
+    // 돌 무리의 "시작점"만 고르는 범위라서, 범위를 넓게 주면(예: 3x3 박스) 시작점이 구석에서
+    // 먼 칸으로 뽑혀 활로가 4개인 평범한 자리가 나올 수 있다. 그래서 시작점을 정확히
+    // 구석 칸(활로 2개) 하나로 고정한다 — size가 2 이상이면 거기서 한 칸만 자란다.
+    function randomCornerRegion() {
+        const corners = [
+            { minX: 0, maxX: 0, minY: 0, maxY: 0 },
+            { minX: 8, maxX: 8, minY: 0, maxY: 0 },
+            { minX: 0, maxX: 0, minY: 8, maxY: 8 },
+            { minX: 8, maxX: 8, minY: 8, maxY: 8 }
+        ];
+        return corners[randInt(0, corners.length - 1)];
+    }
+
+    // 9x9 판의 네 변(끝선, 구석 제외) 중 하나를 무작위로 고른다. 구석과 같은 이유로,
+    // 시작점의 한 축은 정확히 맨 끝줄(0 또는 8)로 고정하고 다른 축만 가운데 쪽에서
+    // 무작위로 골라서, 시작점이 항상 활로 3개짜리 진짜 "끝선" 자리가 되게 한다.
+    function randomEdgeRegion() {
+        const edges = [
+            { minX: 2, maxX: 6, minY: 0, maxY: 0 },
+            { minX: 2, maxX: 6, minY: 8, maxY: 8 },
+            { minX: 0, maxX: 0, minY: 2, maxY: 6 },
+            { minX: 8, maxX: 8, minY: 2, maxY: 6 }
+        ];
+        return edges[randInt(0, edges.length - 1)];
     }
 
     /* =========================================================
@@ -1479,6 +1508,8 @@
 
     // 돌을 잡아먹는 개념(활로 → 단수 → 따냄)을 보여주는 슬라이드. 5x5 미니 바둑판
     // 좌표(0~4)를 쓰며, highlights는 "여기가 활로예요/여기를 막아야 해요"를 점선 동그라미로 표시한다.
+    // 혼자 있는 돌 → 여러 개로 이어진 돌 → 구석 → 끝선 순서로, 뒤에 나오는 퀴즈의
+    // 4가지 유형(적은 돌/많은 돌/구석/끝선)을 그대로 미리 보여주도록 구성했다.
     const CATCH_LEARN_SLIDES = [
         {
             title: '① 활로(숨구멍)란?',
@@ -1499,15 +1530,46 @@
             highlights: [{x:2,y:2}]
         },
         {
-            title: '④ 여러 개로 이어진 돌도 똑같아요',
-            desc: '백돌 2개가 붙어있으면 활로도 6개예요. 이 6개를 모두 막아야 한꺼번에 잡을 수 있어요.',
-            blackStones: [{x:1,y:2},{x:2,y:1},{x:3,y:1},{x:4,y:2},{x:2,y:3},{x:3,y:3}],
+            title: '④ 여러 개로 이어진 돌은 활로가 더 많아요',
+            desc: '백돌 2개가 붙어있으면 활로가 6개예요. 흑돌 5개로 5군데를 막아서 이제 1개만 남았어요 — 역시 단수예요!',
+            blackStones: [{x:1,y:2},{x:2,y:1},{x:2,y:3},{x:3,y:1},{x:4,y:2}],
             whiteStones: [{x:2,y:2},{x:3,y:2}],
-            highlights: []
+            highlights: [{x:3,y:3}]
         },
         {
-            title: '⑤ 이제 퀴즈로 연습해봐요!',
-            desc: '다양한 상황에서 단수 상태의 백돌을 발견하고, 마지막 활로에 흑돌을 놓아 잡아보세요!',
+            title: '⑤ 마지막 활로까지 막으면 한꺼번에 잡혀요!',
+            desc: '이어진 돌은 한 개씩이 아니라 무리 전체가 한꺼번에 잡혀요. 백돌이 많아도 원리는 똑같아요!',
+            blackStones: [{x:1,y:2},{x:2,y:1},{x:2,y:3},{x:3,y:1},{x:4,y:2},{x:3,y:3}],
+            whiteStones: [],
+            highlights: [{x:2,y:2},{x:3,y:2}]
+        },
+        {
+            title: '⑥ 구석(모서리)은 활로가 더 적어요',
+            desc: '구석 자리는 사방이 아니라 오른쪽·아래쪽 딱 2군데만 활로가 있어요. 활로가 적으니까 더 쉽게 단수가 돼요.',
+            blackStones: [], whiteStones: [{x:0,y:0}],
+            highlights: [{x:1,y:0},{x:0,y:1}]
+        },
+        {
+            title: '⑦ 구석 돌도 마지막 활로를 막으면 잡아요',
+            desc: '활로 2개 중 1개를 흑돌로 막았어요. 남은 활로 1개에 흑돌을 놓으면 바로 잡을 수 있어요!',
+            blackStones: [{x:1,y:0}], whiteStones: [{x:0,y:0}],
+            highlights: [{x:0,y:1}]
+        },
+        {
+            title: '⑧ 끝선(가장자리)도 활로가 하나 적어요',
+            desc: '판 맨 바깥줄에 있으면 활로가 4개가 아니라 3개예요. 구석보단 많지만 가운데보단 적어요.',
+            blackStones: [], whiteStones: [{x:2,y:0}],
+            highlights: [{x:1,y:0},{x:3,y:0},{x:2,y:1}]
+        },
+        {
+            title: '⑨ 끝선 돌도 마지막 활로를 막으면 잡아요',
+            desc: '활로 3개 중 2개를 막았어요. 남은 활로 1개에 흑돌을 놓으면 잡을 수 있어요!',
+            blackStones: [{x:1,y:0},{x:3,y:0}], whiteStones: [{x:2,y:0}],
+            highlights: [{x:2,y:1}]
+        },
+        {
+            title: '⑩ 이제 다양한 상황에서 연습해봐요!',
+            desc: '퀴즈에는 돌 1개부터 여러 개까지, 판 가운데부터 구석·끝선까지 다양한 상황이 나와요. 단수된 백돌을 찾아 마지막 활로에 흑돌을 놓아보세요!',
             blackStones: [{x:1,y:2},{x:2,y:1},{x:3,y:2}], whiteStones: [{x:2,y:2}],
             highlights: [{x:2,y:3}]
         }
@@ -1516,8 +1578,25 @@
     const TOPICS = [
         { key: 'catchbasics', title: '[Lv. 1] 돌 잡아먹기', sub: '단수된 돌을 잡는 원리를 배우고 연습해요',
           learnSlides: CATCH_LEARN_SLIDES,
-          counts: [4, 4, 3],
-          tiers: [() => genCapture(1), () => genCapture(2), () => genCapture(3)] },
+          counts: [5, 5, 5, 5],
+          tiers: [
+              () => genCapture(randInt(1, 2)),
+              () => {
+                  const p = genCapture(randInt(4, 6));
+                  if (p) p.desc = '이번엔 백돌이 여러 개예요! 활로를 모두 찾아서 마지막 자리에 흑돌을 놓아보세요.';
+                  return p;
+              },
+              () => {
+                  const p = genCapture(randInt(1, 2), randomCornerRegion());
+                  if (p) p.desc = '구석에 있는 백돌이에요. 활로가 원래 적어서 금방 단수가 돼요. 마지막 활로를 찾아보세요!';
+                  return p;
+              },
+              () => {
+                  const p = genCapture(randInt(1, 2), randomEdgeRegion());
+                  if (p) p.desc = '가장자리(끝선)에 있는 백돌이에요. 활로가 하나 적어요. 마지막 활로를 찾아보세요!';
+                  return p;
+              }
+          ] },
         { key: 'territory', title: '[Lv. 2] 승부 결정하기', sub: '집이 더 많은 쪽, 이긴 돌을 맞혀요',
           counts: [5, 15],
           tiers: [() => genTerritoryProblem('simple'), () => genTerritoryProblem('complex')] },
