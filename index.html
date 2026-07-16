@@ -1184,15 +1184,63 @@
     /* =========================================================
        ⓪ 승부 결정하기 (집 세기 / 승자 맞히기)
     ========================================================= */
-    // 흑/백 각각 1~3개의 씨앗점을 무작위로 뿌리고, 모든 칸을 "가장 가까운 씨앗의 색"에
-    // 배정하는 방식(보로노이 분할)으로 집 모양을 만든다. 이러면 매번 다른 모양의
-    // 자연스러운(동서/남북 한 줄로 안 갈리는) 집이 나오고, 씨앗을 여러 개 두면 한쪽
-    // 색이 여러 군데로 나뉜 집을 가질 수도 있다. 두 색이 만나는 경계 칸은 돌로,
-    // 자기 색 칸으로만 둘러싸인 칸은 집(영토)으로 처리한다.
-    // 실전 느낌을 위해, 활로가 1개뿐(단수 상태)인 돌이 하나라도 있으면 그 배치는 버리고 다시 만든다.
-    function genTerritoryProblem(difficulty) {
+    // mode: 'simple' (1~5번, 동서/남북으로 확실하게 갈라 차이가 한눈에 보이는 맛보기 문제)
+    //       'complex' (6~20번, 흑/백 모두 집이 여러 채로 흩어져 있고 판이 실제 종국처럼
+    //       돌로 빽빽한 문제)
+    function genTerritoryProblem(mode) {
+        return mode === 'simple' ? genTerritorySimple() : genTerritoryComplex();
+    }
+
+    // 씨앗 하나짜리 물결 경계선으로 판을 동서(또는 남북)로 절반씩 딱 갈라서,
+    // 집 차이가 누가 봐도 확실하게 드러나게 만든다.
+    function genTerritorySimple() {
         let fallback = null;
-        for (let attempt = 0; attempt < 500; attempt++) {
+        const transpose = Math.random() < 0.5;
+        for (let attempt = 0; attempt < 300; attempt++) {
+            let c = randInt(2, 6);
+            const aOnLeft = Math.random() < 0.5;
+            const boundaryCol = [];
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                if (row > 0) {
+                    c += randInt(-1, 1);
+                    c = Math.max(1, Math.min(7, c));
+                }
+                boundaryCol.push(c);
+            }
+
+            const ownerMap = {};
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    const side = col <= boundaryCol[row] ? (aOnLeft ? 'A' : 'B') : (aOnLeft ? 'B' : 'A');
+                    const x = transpose ? row : col;
+                    const y = transpose ? col : row;
+                    ownerMap[key(x, y)] = side;
+                }
+            }
+
+            const built = buildStonesAndTerritory(ownerMap);
+            if (!built) continue;
+            const diff = Math.abs(built.scoreA - built.scoreB);
+            if (diff === 0) continue;
+
+            fallback = built;
+            if (diff >= 8) break;
+        }
+        return finalizeTerritoryProblem(fallback,
+            '바둑이 끝났어요! 누가 이겼을까요? 집이 훨씬 많은 쪽의 돌을 골라보세요!');
+    }
+
+    // 흑/백 각각 2~3개의 씨앗점을 뿌려 보로노이 방식으로 구역을 나누되, 구역마다 씨앗에서
+    // 가까운 몇 칸만 실제 집(빈 칸)으로 남기고 나머지 내부 칸은 모두 돌로 채운다. 이러면
+    // 판 전체가 돌로 빽빽하고 군데군데 작은 집만 남은 "실제 종국" 모습이 되고, 씨앗이
+    // 여러 개라서 흑/백 모두 자연스럽게 여러 채로 나뉜 집을 갖게 된다.
+    // (구역을 통째로 집으로 남기면 빈 공간이 너무 커져서 "게임 중간에 집계하는" 느낌이
+    // 나기 때문에, 구역 크기와 상관없이 집 개수를 몇 칸으로 제한하는 방식으로 바꿨다.)
+    function genTerritoryComplex() {
+        const gapMode = Math.random() < 0.5 ? 'medium' : 'tight';
+        let fallback = null;
+        let validCount = 0;
+        for (let attempt = 0; attempt < 300; attempt++) {
             const seeds = [];
             const usedSeedKeys = new Set();
             const addSeeds = (side, count) => {
@@ -1203,21 +1251,19 @@
                     const k = key(x, y);
                     if (usedSeedKeys.has(k)) continue;
                     usedSeedKeys.add(k);
-                    // 씨앗 좌표에 작은 무작위 지터를 줘서, 두 씨앗이 우연히 같은 행/열에 놓여도
-                    // 경계가 완전한 직선(동서/남북 한 줄)이 되지 않고 항상 자연스럽게 구불거리게 한다.
                     seeds.push({
-                        x, y, side,
+                        idx: seeds.length, side,
                         jx: x + (Math.random() - 0.5) * 1.8,
                         jy: y + (Math.random() - 0.5) * 1.8
                     });
                     added++;
                 }
             };
-            addSeeds('A', randInt(1, 3));
-            addSeeds('B', randInt(1, 3));
+            addSeeds('A', randInt(2, 3));
+            addSeeds('B', randInt(2, 3));
             if (!seeds.some(s => s.side === 'A') || !seeds.some(s => s.side === 'B')) continue;
 
-            const ownerMap = {};
+            const ownerMap = {}, zoneMap = {};
             for (let y = 0; y < BOARD_SIZE; y++) {
                 for (let x = 0; x < BOARD_SIZE; x++) {
                     let best = null, bestDist = Infinity;
@@ -1226,104 +1272,143 @@
                         if (d < bestDist) { bestDist = d; best = s; }
                     });
                     ownerMap[key(x, y)] = best.side;
+                    zoneMap[key(x, y)] = best.idx;
                 }
             }
 
-            // 모든 가로줄(또는 모든 세로줄)에서 A가 차지한 칸 수가 완전히 똑같으면
-            // 동서/남북으로 반듯하게 갈린 한 줄짜리 경계라는 뜻이므로 버리고 다시 만든다.
-            const rowCountsA = [], colCountsA = [];
-            for (let y = 0; y < BOARD_SIZE; y++) {
-                let c = 0;
-                for (let x = 0; x < BOARD_SIZE; x++) if (ownerMap[key(x, y)] === 'A') c++;
-                rowCountsA.push(c);
-            }
-            for (let x = 0; x < BOARD_SIZE; x++) {
-                let c = 0;
-                for (let y = 0; y < BOARD_SIZE; y++) if (ownerMap[key(x, y)] === 'A') c++;
-                colCountsA.push(c);
-            }
-            const isPerfectlyStraight = new Set(rowCountsA).size === 1 || new Set(colCountsA).size === 1;
-            if (isPerfectlyStraight) continue;
-
-            const sideAStones = [], sideBStones = [];
-            let sideATerritory = 0, sideBTerritory = 0;
+            // 반대색과 맞닿은 경계 칸은 무조건 돌. 나머지 내부 칸은 구역별로 모아서,
+            // 씨앗에 가까운 순서로 앞쪽 몇 칸(cap)만 집으로 남기고 나머지는 돌로 바꾼다.
+            const zoneInterior = {};
             for (let y = 0; y < BOARD_SIZE; y++) {
                 for (let x = 0; x < BOARD_SIZE; x++) {
-                    const mySide = ownerMap[key(x, y)];
+                    const k = key(x, y);
+                    const mySide = ownerMap[k];
                     const isBoundary = neighbors4(x, y).some(([nx, ny]) => ownerMap[key(nx, ny)] !== mySide);
-                    if (isBoundary) {
-                        (mySide === 'A' ? sideAStones : sideBStones).push({ x, y });
-                    } else if (mySide === 'A') {
-                        sideATerritory++;
-                    } else {
-                        sideBTerritory++;
-                    }
+                    if (isBoundary) continue;
+                    const idx = zoneMap[k];
+                    const s = seeds[idx];
+                    const dist = Math.abs(s.jx - x) + Math.abs(s.jy - y);
+                    (zoneInterior[idx] = zoneInterior[idx] || []).push({ x, y, dist, k });
                 }
             }
+            const territoryKeys = new Set();
+            Object.values(zoneInterior).forEach(cells => {
+                cells.sort((a, b) => a.dist - b.dist);
+                const cap = randInt(2, 6);
+                cells.slice(0, cap).forEach(c => territoryKeys.add(c.k));
+            });
 
-            // 활로는 돌 하나가 아니라 "연결된 돌 무리(그룹)" 전체 기준으로 세야 바둑 규칙과 맞는다.
-            const sideAKeys = new Set(sideAStones.map(p => key(p.x, p.y)));
-            const sideBKeys = new Set(sideBStones.map(p => key(p.x, p.y)));
-            const allStoneKeys = new Set([...sideAKeys, ...sideBKeys]);
-
-            const minGroupLiberties = (stoneList, ownKeys) => {
+            // 한쪽 색의 집이 사실상 한 군데로만 뭉쳐 있으면 "여러 채" 조건에 안 맞으니
+            // 버리고 다시 만든다.
+            const housesOf = (side) => {
+                const cells = [];
+                territoryKeys.forEach(k => { if (ownerMap[k] === side) cells.push(k); });
+                const cellSet = new Set(cells);
                 const visited = new Set();
-                let minLibs = Infinity;
-                stoneList.forEach(({ x, y }) => {
-                    const startKey = key(x, y);
-                    if (visited.has(startKey)) return;
-                    visited.add(startKey);
+                let houses = 0;
+                cells.forEach(k => {
+                    if (visited.has(k)) return;
+                    houses++;
+                    const [x, y] = k.split('_').map(Number);
                     const stack = [[x, y]];
-                    const libSet = new Set();
+                    visited.add(k);
                     while (stack.length) {
                         const [cx, cy] = stack.pop();
                         neighbors4(cx, cy).forEach(([nx, ny]) => {
                             const nk = key(nx, ny);
-                            if (!allStoneKeys.has(nk)) {
-                                libSet.add(nk);
-                            } else if (ownKeys.has(nk) && !visited.has(nk)) {
-                                visited.add(nk);
-                                stack.push([nx, ny]);
-                            }
+                            if (cellSet.has(nk) && !visited.has(nk)) { visited.add(nk); stack.push([nx, ny]); }
                         });
                     }
-                    if (libSet.size < minLibs) minLibs = libSet.size;
                 });
-                return minLibs;
+                return houses;
             };
+            if (housesOf('A') < 2 || housesOf('B') < 2) continue;
 
-            const minLibsA = minGroupLiberties(sideAStones, sideAKeys);
-            const minLibsB = minGroupLiberties(sideBStones, sideBKeys);
-            if (minLibsA < 2 || minLibsB < 2) continue;
-
-            const scoreA = sideAStones.length + sideATerritory;
-            const scoreB = sideBStones.length + sideBTerritory;
-            const diff = Math.abs(scoreA - scoreB);
+            const built = buildStonesAndTerritory(ownerMap, territoryKeys);
+            if (!built) continue;
+            const diff = Math.abs(built.scoreA - built.scoreB);
             if (diff === 0) continue;
 
-            const inRange = difficulty === 'easy' ? diff >= 8 :
-                difficulty === 'medium' ? (diff >= 3 && diff <= 9) :
-                (diff >= 1 && diff <= 4);
-
-            fallback = { sideAStones, sideBStones, scoreA, scoreB };
+            const inRange = gapMode === 'medium' ? (diff >= 3 && diff <= 9) : (diff >= 1 && diff <= 4);
+            fallback = built;
             if (inRange) break;
+            validCount++;
+            if (validCount >= 20) break;
         }
-        let best = fallback;
+        return finalizeTerritoryProblem(fallback,
+            '바둑이 끝났어요! 양쪽에 집이 여러 군데 흩어져 있어요. 하나하나 꼼꼼히 세어서 이긴 쪽을 골라보세요!');
+    }
+
+    // ownerMap(칸별 A/B 소유)으로 돌 배치와 집 개수를 계산한다. territoryKeys를 주면 그
+    // 칸들만 집으로 남기고 나머지 내부 칸은 돌로 채우며(complex 모드), 안 주면 경계가
+    // 아닌 내부 칸 전체가 집이 된다(simple 모드). 활로가 1개뿐(단수)인 돌 무리가 있으면
+    // null을 돌려줘서 그 배치를 버리게 한다.
+    function buildStonesAndTerritory(ownerMap, territoryKeys) {
+        const sideAStones = [], sideBStones = [];
+        let sideATerritory = 0, sideBTerritory = 0;
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                const k = key(x, y);
+                const mySide = ownerMap[k];
+                const isBoundary = neighbors4(x, y).some(([nx, ny]) => ownerMap[key(nx, ny)] !== mySide);
+                const isTerritory = !isBoundary && (!territoryKeys || territoryKeys.has(k));
+                if (isTerritory) {
+                    if (mySide === 'A') sideATerritory++; else sideBTerritory++;
+                } else {
+                    (mySide === 'A' ? sideAStones : sideBStones).push({ x, y });
+                }
+            }
+        }
+
+        // 활로는 돌 하나가 아니라 "연결된 돌 무리(그룹)" 전체 기준으로 세야 바둑 규칙과 맞는다.
+        const sideAKeys = new Set(sideAStones.map(p => key(p.x, p.y)));
+        const sideBKeys = new Set(sideBStones.map(p => key(p.x, p.y)));
+        const allStoneKeys = new Set([...sideAKeys, ...sideBKeys]);
+
+        const minGroupLiberties = (stoneList, ownKeys) => {
+            const visited = new Set();
+            let minLibs = Infinity;
+            stoneList.forEach(({ x, y }) => {
+                const startKey = key(x, y);
+                if (visited.has(startKey)) return;
+                visited.add(startKey);
+                const stack = [[x, y]];
+                const libSet = new Set();
+                while (stack.length) {
+                    const [cx, cy] = stack.pop();
+                    neighbors4(cx, cy).forEach(([nx, ny]) => {
+                        const nk = key(nx, ny);
+                        if (!allStoneKeys.has(nk)) {
+                            libSet.add(nk);
+                        } else if (ownKeys.has(nk) && !visited.has(nk)) {
+                            visited.add(nk);
+                            stack.push([nx, ny]);
+                        }
+                    });
+                }
+                if (libSet.size < minLibs) minLibs = libSet.size;
+            });
+            return minLibs;
+        };
+        const minLibsA = minGroupLiberties(sideAStones, sideAKeys);
+        const minLibsB = minGroupLiberties(sideBStones, sideBKeys);
+        if (minLibsA < 2 || minLibsB < 2) return null;
+
+        return {
+            sideAStones, sideBStones,
+            scoreA: sideAStones.length + sideATerritory,
+            scoreB: sideBStones.length + sideBTerritory
+        };
+    }
+
+    function finalizeTerritoryProblem(best, desc) {
         if (!best) return null;
-
-        let blackIsA = Math.random() < 0.5;
-        let blackStones = blackIsA ? best.sideAStones : best.sideBStones;
-        let whiteStones = blackIsA ? best.sideBStones : best.sideAStones;
-        let blackScore = blackIsA ? best.scoreA : best.scoreB;
-        let whiteScore = blackIsA ? best.scoreB : best.scoreA;
-        let winner = blackScore > whiteScore ? 'black' : 'white';
-
-        let desc = difficulty === 'easy'
-            ? '바둑이 끝났어요! 누가 이겼을까요? 집이 훨씬 많은 쪽의 돌을 골라보세요!'
-            : difficulty === 'medium'
-            ? '바둑이 끝났어요! 양쪽의 집을 잘 세어보고, 이긴 쪽의 돌을 골라보세요!'
-            : '바둑이 끝났어요! 아주 팽팽한 승부예요. 집을 꼼꼼히 세어보고 이긴 쪽을 골라보세요!';
-
+        const blackIsA = Math.random() < 0.5;
+        const blackStones = blackIsA ? best.sideAStones : best.sideBStones;
+        const whiteStones = blackIsA ? best.sideBStones : best.sideAStones;
+        const blackScore = blackIsA ? best.scoreA : best.scoreB;
+        const whiteScore = blackIsA ? best.scoreB : best.scoreA;
+        const winner = blackScore > whiteScore ? 'black' : 'white';
         return {
             type: 'choose_side',
             blackStones, whiteStones,
@@ -1343,18 +1428,19 @@
         return genLiberty(1);
     }
 
-    function generateTopicSet(tierFns) {
-        let counts = [7, 7, 6];
+    function generateTopicSet(tierFns, counts) {
+        counts = counts || [7, 7, 6];
         let result = [];
         tierFns.forEach((fn, idx) => {
-            for (let i = 0; i < counts[idx]; i++) result.push(safeCall(fn));
+            for (let i = 0; i < (counts[idx] || 0); i++) result.push(safeCall(fn));
         });
         return result;
     }
 
     const TOPICS = [
         { key: 'territory', title: '[Lv. 1] 승부 결정하기', sub: '집이 더 많은 쪽, 이긴 돌을 맞혀요',
-          tiers: [() => genTerritoryProblem('easy'), () => genTerritoryProblem('medium'), () => genTerritoryProblem('hard')] },
+          counts: [5, 15],
+          tiers: [() => genTerritoryProblem('simple'), () => genTerritoryProblem('complex')] },
         { key: 'liberty', title: '[Lv. 2] 활로찾기', sub: '돌이 살아있는 숨구멍을 모두 찾아요',
           tiers: [() => genLiberty(1), () => genLiberty(2), () => genLiberty(3)] },
         { key: 'atari', title: '[Lv. 3] 단수의 기술', sub: '상대 돌의 활로를 1개로 줄여요',
@@ -1448,7 +1534,7 @@
         if (!isTopicUnlocked(idx, character)) { alert('이전 레벨을 먼저 클리어해야 열려요!'); return; }
         currentTopicKey = topicKey;
         let topic = TOPICS.find(t => t.key === topicKey);
-        problemsList = generateTopicSet(topic.tiers);
+        problemsList = generateTopicSet(topic.tiers, topic.counts);
         currentProblemIndex = 0;
         totalScore = 0;
         document.getElementById('game-title').innerText = topic.title;
