@@ -1616,6 +1616,42 @@
     //                      있으면 집이 아니다"(집 개수 0)를 보여준다
     //  - 'application'   : 벽 바깥, 안쪽 빈 칸과는 직접 닿지 않는 자리에 백돌을 하나
     //                      놓아서 "담벼락 바깥에 붙은 돌은 집에 영향이 없다"를 보여준다
+    // blackStones/whiteStones로 표현된 판에서 흑집을 표준 규칙대로 정확히 센다: 빈 칸을
+    // flood-fill해서, 그 영역이 흑에만 닿고 백에는 안 닿을 때만(공배 아닐 때만) 집으로 센다.
+    // 하드코딩된 가정 없이 매번 실제로 계산하므로, 어떤 모양이 나오든 항상 정확하다.
+    // blobSet을 주면, 원래 만들었던 "덩어리" 칸들만 집으로 세고 판의 나머지 빈 공간(이
+    // 문제와 상관없는 여백)은 세지 않는다 - 담이 끊겨서 그 여백과 이어지면 공배 판정으로
+    // 자연히 0이 되지만, 안 끊긴 경우에 판의 텅 빈 나머지 공간까지 흑집으로 잡히는 걸 막는다.
+    function computeBlackTerritoryCount(blackStones, whiteStones, blobSet) {
+        const blackSet = new Set(blackStones.map(s => key(s.x, s.y)));
+        const whiteSet = new Set(whiteStones.map(s => key(s.x, s.y)));
+        const visited = new Set();
+        let total = 0;
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                const k = key(x, y);
+                if (blackSet.has(k) || whiteSet.has(k) || visited.has(k)) continue;
+                visited.add(k);
+                const stack = [[x, y]];
+                const region = [[x, y]];
+                let touchesWhite = false, touchesBlack = false;
+                while (stack.length) {
+                    const [cx, cy] = stack.pop();
+                    neighbors4(cx, cy).forEach(([nx, ny]) => {
+                        const nk = key(nx, ny);
+                        if (whiteSet.has(nk)) { touchesWhite = true; return; }
+                        if (blackSet.has(nk)) { touchesBlack = true; return; }
+                        if (!visited.has(nk)) { visited.add(nk); region.push([nx, ny]); stack.push([nx, ny]); }
+                    });
+                }
+                if (touchesBlack && !touchesWhite) {
+                    total += blobSet ? region.filter(([rx, ry]) => blobSet.has(key(rx, ry))).length : region.length;
+                }
+            }
+        }
+        return total;
+    }
+
     function genTerritoryCount(mode) {
         for (let attempt = 0; attempt < 200; attempt++) {
             const size = mode === 'shape' ? randInt(10, 16) : randInt(6, 12);
@@ -1636,14 +1672,26 @@
             if (touchesEdge || wallSet.size < 4) continue;
 
             let whiteStones = [];
-            let answer = blobArr.length;
             let desc = '까맣게 둘러싸인 빈 칸을 잘 세어보세요. 이 흑집은 몇 집일까요?';
 
             if (mode === 'trick') {
-                const pick = blobArr[randInt(0, blobArr.length - 1)];
-                whiteStones = [{ x: pick[0], y: pick[1] }];
-                answer = 0;
-                desc = '집처럼 보이지만... 안을 자세히 살펴보세요! 백돌이 하나라도 있으면 그 집은 몇 집일까요?';
+                // 담벼락(벽) 중 한 칸을 치워서 진짜로 "끊긴" 자리를 만들고, 그 끊긴 틈의
+                // 바깥쪽에 백돌을 하나 둔다. 벽이 끊기면 안쪽 빈 칸이 그 틈을 통해 바깥의
+                // 백돌과 이어지므로, 표준 규칙(빈 칸이 백에도 닿으면 공배)대로 계산하면
+                // 자연스럽게 0집이 된다 - "백돌이 하나라도 있으면 무조건 0"이 아니라,
+                // 실제로 담이 끊겨서 이어졌을 때만 0이 되는 게 핵심이다.
+                const wallArr = [...wallSet];
+                const gapKey = wallArr[randInt(0, wallArr.length - 1)];
+                const [gx, gy] = gapKey.split('_').map(Number);
+                const outerNeighbors = neighbors4(gx, gy).filter(([nx, ny]) => {
+                    const nk = key(nx, ny);
+                    return !blobSet.has(nk) && nk !== gapKey && !wallSet.has(nk);
+                });
+                if (outerNeighbors.length === 0) continue;
+                wallSet.delete(gapKey);
+                const [wx, wy] = outerNeighbors[randInt(0, outerNeighbors.length - 1)];
+                whiteStones = [{ x: wx, y: wy }];
+                desc = '어라? 담벼락 한 곳이 끊겨 있어요! 안쪽이 바깥의 백돌과 이어져 버렸어요. 이 흑집은 몇 집일까요?';
             } else if (mode === 'application') {
                 const outerCandidates = [];
                 wallSet.forEach(wk => {
@@ -1657,10 +1705,11 @@
                 });
                 if (outerCandidates.length === 0) continue;
                 whiteStones = [outerCandidates[randInt(0, outerCandidates.length - 1)]];
-                desc = '담벼락 바깥에 백돌이 하나 붙어있어요. 안쪽 집 개수에 영향이 있을까요? 몇 집인지 세어보세요!';
+                desc = '담벼락 바깥에 백돌이 하나 붙어있어요. 담이 끊기지 않았다면 안쪽 집 개수에 영향이 없어요. 몇 집인지 세어보세요!';
             }
 
             const blackStones = [...wallSet].map(k => { const [x, y] = k.split('_').map(Number); return { x, y }; });
+            const answer = computeBlackTerritoryCount(blackStones, whiteStones, blobSet);
 
             const decoyPool = new Set();
             if (answer === 0) {
@@ -1791,22 +1840,22 @@
             highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2}]
         },
         {
-            title: '④ 속임수! 안에 백돌이 있으면 0집',
-            desc: '집처럼 보여도 안에 백돌이 하나라도 있으면, 그 집은 통째로 0집이 돼요!',
-            blackStones: [{x:0,y:1},{x:0,y:2},{x:3,y:1},{x:3,y:2},{x:1,y:0},{x:2,y:0},{x:1,y:3},{x:2,y:3}],
-            whiteStones: [{x:2,y:2}],
-            highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2}]
+            title: '④ 속임수! 담벼락이 끊기면 0집',
+            desc: '자세히 보면 담벼락 한 칸이 비어서 끊겨 있어요! 안쪽이 그 틈을 통해 바깥의 백돌과 이어져 버려서, 이 집은 통째로 0집이 돼요.',
+            blackStones: [{x:0,y:2},{x:3,y:1},{x:3,y:2},{x:1,y:0},{x:2,y:0},{x:1,y:3},{x:2,y:3}],
+            whiteStones: [{x:0,y:0}],
+            highlights: [{x:0,y:1}]
         },
         {
-            title: '⑤ 담벼락 바깥에 있는 돌은 괜찮아요',
-            desc: '이 백돌은 담벼락 바깥에 붙어있을 뿐이에요. 안쪽 집 개수는 그대로! 여전히 4집이에요.',
+            title: '⑤ 담벼락이 안 끊겼다면 바깥 돌은 괜찮아요',
+            desc: '이번엔 담벼락이 완전히 이어져 있어요. 백돌이 바깥에 붙어있어도 안쪽과는 안 닿으니 집 개수는 그대로! 여전히 4집이에요.',
             blackStones: [{x:0,y:1},{x:0,y:2},{x:3,y:1},{x:3,y:2},{x:1,y:0},{x:2,y:0},{x:1,y:3},{x:2,y:3}],
             whiteStones: [{x:0,y:0}],
             highlights: [{x:1,y:1},{x:2,y:1},{x:1,y:2},{x:2,y:2}]
         },
         {
             title: '⑥ 이제 퀴즈로 확인해봐요!',
-            desc: '다양한 모양의 집을 보고 몇 집인지 정확히 세어보세요. 안에 다른 색 돌이 숨어있는지도 잘 살펴봐야 해요!',
+            desc: '다양한 모양의 집을 보고 몇 집인지 정확히 세어보세요. 담벼락이 끊긴 곳은 없는지도 잘 살펴봐야 해요!',
             blackStones: [{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:1,y:2},{x:3,y:2},{x:1,y:3},{x:2,y:3},{x:3,y:3}],
             whiteStones: [],
             highlights: [{x:2,y:2}]
