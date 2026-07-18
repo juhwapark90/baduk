@@ -101,21 +101,26 @@
         /* 아바타 (이모지 + 액세서리 겹치기)
            기기/브라우저마다 이모지 폰트의 실제 그림 위치(패딩)가 달라 텍스트 이모지로는
            위치가 흔들리므로, 미리 내려받아 페이지에 내장한 고정 이미지(svg, EMOJI_SVG)로
-           통일해 그려서 네트워크 상태와 무관하게 모든 기기에서 동일하게 보이게 한다. */
+           통일해 그려서 네트워크 상태와 무관하게 모든 기기에서 동일하게 보이게 한다.
+           상의(옷)는 "얼굴 뒤에 숨기는" z-index 겹침 방식 대신, 얼굴과 아예 겹치지 않게
+           얼굴 아래 별도 줄에 옷 그림의 어깨선 부분만 overflow:hidden으로 잘라 보여준다.
+           (겹침/쌓임 순서에 기대지 않는 방식이라 어떤 브라우저에서도 항상 같게 보인다) */
         img.emoji { height: 1em; width: 1em; vertical-align: -0.1em; display: inline-block; }
-        .avatar-display { position: relative; display: inline-block; line-height: 1; }
-        .avatar-display .avatar-base { position: relative; z-index: 2; display: inline-block; }
-        .avatar-display .acc { position: absolute; }
-        .avatar-display .acc-hat { top: -0.42em; left: 50%; transform: translateX(-50%) scale(0.55); z-index: 3; }
-        .avatar-display .acc-glasses { top: 34%; left: 50%; transform: translate(-50%, -50%) scale(0.62); z-index: 3; }
-        .avatar-display .acc-glasses_goggle { top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.62); }
-        .avatar-display .acc-top { bottom: -0.05em; left: 50%; transform: translateX(-50%) scale(1); z-index: 1; }
-        .avatar-display .acc-extra { bottom: 0; right: 0; left: auto; top: auto; transform: scale(0.4); z-index: 3; }
-        .avatar-display .acc-extra_ribbon { top: -0.06em; left: 50%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.42); }
-        .avatar-display .acc-extra_scarf { top: 85%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.5); }
-        .avatar-display .acc-extra_necklace { top: 85%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.36); }
-        .avatar-display .acc-extra_flower { top: 4%; left: 20%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.34); }
-        .avatar-display .acc-extra_butterfly { top: 14%; left: 84%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.32); }
+        .avatar-display { position: relative; display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
+        .avatar-head { position: relative; width: 1em; height: 1em; flex: none; }
+        .avatar-head .avatar-base { position: relative; z-index: 2; display: inline-block; }
+        .avatar-head .acc { position: absolute; }
+        .avatar-head .acc-hat { top: -0.42em; left: 50%; transform: translateX(-50%) scale(0.55); z-index: 3; }
+        .avatar-head .acc-glasses { top: 34%; left: 50%; transform: translate(-50%, -50%) scale(0.62); z-index: 3; }
+        .avatar-head .acc-glasses_goggle { top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.62); }
+        .avatar-head .acc-extra { bottom: 0; right: 0; left: auto; top: auto; transform: scale(0.4); z-index: 3; }
+        .avatar-head .acc-extra_ribbon { top: -0.06em; left: 50%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.42); }
+        .avatar-head .acc-extra_scarf { top: 85%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.5); }
+        .avatar-head .acc-extra_necklace { top: 85%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.36); }
+        .avatar-head .acc-extra_flower { top: 4%; left: 20%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.34); }
+        .avatar-head .acc-extra_butterfly { top: 14%; left: 84%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.32); }
+        .acc-top-wrap { width: 0.98em; height: 0.32em; overflow: hidden; margin-top: 0.03em; flex: none; }
+        .acc-top-wrap img.emoji { width: 0.98em; height: 0.98em; }
 
         /* 캐릭터 선택 화면 */
         .character-select-list { display: flex; gap: 12px; width: 100%; margin: 14px 0; flex-wrap: wrap; justify-content: center; }
@@ -761,11 +766,13 @@
         const extra = eq.extra ? SHOP_ITEMS.find(i => i.id === eq.extra) : null;
         return `
             <div class="avatar-display" style="font-size:${size}px;">
-                ${top ? `<span class="acc acc-top acc-${top.id}">${emojiImg(top.emoji)}</span>` : ''}
-                <span class="avatar-base">${emojiImg(character.avatar)}</span>
-                ${hat ? `<span class="acc acc-hat acc-${hat.id}">${emojiImg(hat.emoji)}</span>` : ''}
-                ${glasses ? `<span class="acc acc-glasses acc-${glasses.id}">${emojiImg(glasses.emoji)}</span>` : ''}
-                ${extra ? `<span class="acc acc-extra acc-${extra.id}">${emojiImg(extra.emoji)}</span>` : ''}
+                <div class="avatar-head">
+                    <span class="avatar-base">${emojiImg(character.avatar)}</span>
+                    ${hat ? `<span class="acc acc-hat acc-${hat.id}">${emojiImg(hat.emoji)}</span>` : ''}
+                    ${glasses ? `<span class="acc acc-glasses acc-${glasses.id}">${emojiImg(glasses.emoji)}</span>` : ''}
+                    ${extra ? `<span class="acc acc-extra acc-${extra.id}">${emojiImg(extra.emoji)}</span>` : ''}
+                </div>
+                <div class="acc-top-wrap">${top ? emojiImg(top.emoji) : ''}</div>
             </div>`;
     }
 
