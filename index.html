@@ -2904,16 +2904,28 @@
     }
 
     /* ---------- AI (왕초보 / 초보 / 중수 / 고수) ---------- */
+    // 9x9 판의 화점(귀 4곳 + 중앙 천원) - 초반에 이 근처를 선호하도록 유도해서
+    // "잡을 게 없으면 아무데나 두는" 문제를 없앤다.
+    const AI_STAR_POINTS = [[2, 2], [2, 6], [6, 2], [6, 6], [4, 4]];
+
+    function countStonesOnBoard(board) {
+        let n = 0;
+        for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) if (board[y][x] !== 0) n++;
+        return n;
+    }
+
     // 후보 수 하나를 평가해서 점수를 매긴다. 점수가 높을수록 AI가 선호하는 수.
+    // 잡기/단수 회피 같은 전술 점수에 더해 집(computePlayScore) 차이와 모양(내 돌 근처인지),
+    // 초반 화점 선호까지 반영해서 "잡을 게 없는 국면"에서도 방향성 있게 두도록 한다.
     function evaluateAiMove(board, x, y, color, difficulty) {
         const opponent = color === 'black' ? 'white' : 'black';
         const result = tryPlayMove(board, x, y, color);
         let score = randInt(0, 2);
-        score += result.captured.length * 10;
+        score += result.captured.length * 12;
 
         const myGroup = getGroupAndLiberties(result.board, x, y);
         score += Math.min(myGroup.liberties, 4);
-        if (myGroup.liberties === 1) score -= 8; // 스스로 단수에 놓이는 수는 피한다
+        if (myGroup.liberties === 1) score -= 10; // 스스로 단수에 놓이는 수는 피한다
 
         // 이 수로 상대 무리를 단수로 몰았다면 가산점
         const processedOpp = new Set();
@@ -2922,9 +2934,35 @@
             if (result.board[ny][nx] === opponent && !processedOpp.has(nk)) {
                 const g = getGroupAndLiberties(result.board, nx, ny);
                 g.stones.forEach(([sx, sy]) => processedOpp.add(sx + '_' + sy));
-                if (g.liberties === 1) score += 5;
+                if (g.liberties === 1) score += 6;
             }
         });
+
+        // 집 차이(내 집 - 상대 집). 초반엔 아직 집이 갈리지 않아 영향이 작고,
+        // 판이 채워질수록 점점 중요해져서 자연스럽게 "영역을 넓히는" 수를 선호하게 된다.
+        const scoreNow = computePlayScore(result.board);
+        const myArea = color === 'black' ? scoreNow.blackScore : scoreNow.whiteScore;
+        const oppArea = color === 'black' ? scoreNow.whiteScore : scoreNow.blackScore;
+        score += (myArea - oppArea) * 1.5;
+
+        // 내 돌 근처(반경 2칸 이내)에 두면 가산점 - 외톨이 수를 줄이고 모양을 이어가게 한다.
+        let nearOwnStone = false;
+        for (let dy = -2; dy <= 2 && !nearOwnStone; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
+                const nx = x + dx, ny = y + dy;
+                if (!playInBounds(nx, ny)) continue;
+                if (board[ny][nx] === color) { nearOwnStone = true; break; }
+            }
+        }
+        if (nearOwnStone) score += 2;
+
+        // 초반(돌이 10개 미만)에는 1선(가장자리)을 피하고 화점 근처를 선호한다.
+        if (countStonesOnBoard(board) < 10) {
+            const edgeDist = Math.min(x, y, 8 - x, 8 - y);
+            if (edgeDist === 0) score -= 4;
+            const starDist = Math.min(...AI_STAR_POINTS.map(([sx, sy]) => Math.abs(sx - x) + Math.abs(sy - y)));
+            score += Math.max(0, 3 - starDist);
+        }
 
         if (difficulty === 'high') {
             // 고수는 한 수 더 내다본다: 이 수를 둔 뒤 상대가 무언가를 잡아갈 수 있는지 확인해서 감점한다.
@@ -2955,14 +2993,33 @@
             const pool = capturing.length > 0 ? capturing : (safe.length > 0 ? safe : moves);
             return pool[randInt(0, pool.length - 1)];
         }
-        // 중수 / 고수: 모든 후보 수를 평가해서 가장 높은 점수의 수를 고른다 (동점이면 무작위).
-        let best = [], bestScore = -Infinity;
-        shuffle(moves).forEach(m => {
-            const s = evaluateAiMove(board, m.x, m.y, color, difficulty);
-            if (s > bestScore) { bestScore = s; best = [m]; }
-            else if (s === bestScore) best.push(m);
+
+        // 중수 / 고수 공통: 모든 후보 수를 평가해서 점수순으로 정렬한다.
+        const scored = shuffle(moves).map(m => ({ m: m, s: evaluateAiMove(board, m.x, m.y, color, difficulty) }));
+        scored.sort((a, b) => b.s - a.s);
+
+        if (difficulty === 'mid') {
+            const bestScore = scored[0].s;
+            const best = scored.filter(c => c.s === bestScore).map(c => c.m);
+            return best[randInt(0, best.length - 1)];
+        }
+
+        // 고수: 정적 평가 상위 후보들만 골라, 상대의 최선 응수까지 둬본 뒤(2수 내다보기)
+        // 그 결과 집 차이가 가장 좋은 수를 고른다 - 단순 반응이 아니라 실제로 "내다보고" 둔다.
+        const opponent = color === 'black' ? 'white' : 'black';
+        const topCandidates = scored.slice(0, Math.min(6, scored.length));
+        let bestMove = topCandidates[0].m, bestFinalScore = -Infinity;
+        topCandidates.forEach(({ m }) => {
+            const afterMe = tryPlayMove(board, m.x, m.y, color).board;
+            const oppReply = aiChooseMove(afterMe, opponent, 'mid');
+            const afterOpp = oppReply ? tryPlayMove(afterMe, oppReply.x, oppReply.y, opponent).board : afterMe;
+            const finalScoreBoard = computePlayScore(afterOpp);
+            const myArea = color === 'black' ? finalScoreBoard.blackScore : finalScoreBoard.whiteScore;
+            const oppArea = color === 'black' ? finalScoreBoard.whiteScore : finalScoreBoard.blackScore;
+            const finalScore = (myArea - oppArea) + randInt(0, 1);
+            if (finalScore > bestFinalScore) { bestFinalScore = finalScore; bestMove = m; }
         });
-        return best[randInt(0, best.length - 1)];
+        return bestMove;
     }
 
     function aiTakeTurn() {
