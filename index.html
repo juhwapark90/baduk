@@ -89,6 +89,14 @@
             display: inline-block; font-size: 11px; font-weight: bold; white-space: nowrap; margin-left: 6px;
             background: rgba(255,255,255,0.28); padding: 2px 8px; border-radius: 10px;
         }
+        /* 캐릭터 레벨 강조 배지 - 동기부여 포인트라 눈에 띄게 금색으로 표시한다 */
+        .char-level-badge {
+            display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+            background: linear-gradient(135deg, #ffe28a, #ff9800);
+            color: #7a4300; font-weight: 900; font-size: 12px; letter-spacing: 0.02em;
+            padding: 2px 9px 2px 7px; border-radius: 999px; margin-left: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.55);
+        }
         .topic-progress-bg {
             width: 100%; background: rgba(255,255,255,0.35); border-radius: 8px; height: 8px; margin-top: 6px; overflow: hidden;
         }
@@ -170,6 +178,8 @@
             margin: 0 -25px; padding: 10px 25px 10px; border-bottom: 1px solid #eee;
         }
         .shop-preview { display: flex; justify-content: center; margin: 10px 0; }
+        .shop-level-row { display: flex; justify-content: center; margin-bottom: 8px; }
+        .shop-level-row .char-level-badge { margin-left: 0; font-size: 13px; padding: 3px 11px 3px 8px; }
         .shop-wallet-row { font-size: 16px; font-weight: bold; color: #ff9800; margin-bottom: 10px; }
         .shop-slot-section { margin-bottom: 16px; text-align: left; }
         .shop-slot-title { font-size: 14px; color: #2c5e43; margin: 0 0 8px; }
@@ -308,7 +318,13 @@
             display: flex; align-items: center; gap: 10px; margin-bottom: 10px; box-sizing: border-box; width: 100%;
         }
         .play-info-bar .ch-info, .play-opponent-bar .op-info { flex: 1; text-align: left; }
-        .play-capture-count { font-size: 12px; font-weight: bold; color: #2c5e43; white-space: nowrap; }
+        .play-capture-count { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: bold; color: #2c5e43; white-space: nowrap; }
+        .mini-stone {
+            display: inline-block; width: 12px; height: 12px; border-radius: 50%; flex: none;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.35);
+        }
+        .mini-stone.black { background: radial-gradient(circle at 30% 30%, #555, #111); }
+        .mini-stone.white { background: radial-gradient(circle at 30% 30%, #fff, #d4d4d4); border: 1px solid #ccc; box-sizing: border-box; }
         .play-turn-indicator {
             font-size: 15px; font-weight: bold; color: #2c5e43; margin-bottom: 10px; text-align: center;
         }
@@ -415,6 +431,7 @@
         <h2>🛍️ 캐릭터 상점</h2>
         <div class="shop-sticky-header">
             <div id="shop-preview" class="shop-preview"></div>
+            <div id="shop-level-row" class="shop-level-row"></div>
             <div class="shop-wallet-row">💰 <span id="shop-wallet">0P</span></div>
         </div>
         <div id="shop-item-list"></div>
@@ -658,6 +675,11 @@
     function characterLevel(character) {
         if (!character) return 1;
         return Math.min(countClearedTopics(character) + 1, TOPICS.length);
+    }
+
+    // 레벨을 어디서든 똑같은 "동기부여용" 강조 배지로 보여준다(캐릭터 헤더/선택/상점/대국 화면 공통).
+    function charLevelBadgeHtml(level) {
+        return `<span class="char-level-badge">⭐ Lv.${level}</span>`;
     }
 
     // 총 획득 포인트 = 모든 레벨의 최고 기록(레벨당 최대 100점)을 더한 값.
@@ -966,7 +988,7 @@
         header.innerHTML = `
             ${avatarHtml(character, 40)}
             <div class="ch-info">
-                <div class="ch-name-row">${character.name} <span class="level-badge">Lv.${level}</span></div>
+                <div class="ch-name-row">${character.name} ${charLevelBadgeHtml(level)}</div>
                 <div class="ch-points-row">💰 ${walletBalance(character)}P</div>
             </div>
             <button class="ch-icon-btn" onclick="openCharacterSelect()" title="캐릭터 전환">🔀</button>
@@ -989,7 +1011,7 @@
             card.innerHTML = `
                 ${avatarHtml(c, 56)}
                 <div class="cc-name">${c.name}</div>
-                <div class="cc-level">Lv.${level} · 💰${walletBalance(c)}P</div>
+                <div class="cc-level">${charLevelBadgeHtml(level)} · 💰${walletBalance(c)}P</div>
             `;
             card.onclick = () => selectCharacter(c.id);
             wrap.appendChild(card);
@@ -1099,6 +1121,7 @@
         const character = getActiveCharacter();
         if (!character) return;
         document.getElementById('shop-preview').innerHTML = avatarHtml(character, 88);
+        document.getElementById('shop-level-row').innerHTML = charLevelBadgeHtml(characterLevel(character));
         const balance = walletBalance(character);
         document.getElementById('shop-wallet').innerText = balance + 'P';
 
@@ -2612,8 +2635,8 @@
             if (currentUser && getActiveCharacter()) {
                 const result = saveTopicResult(currentTopicKey, totalScore, roundMax);
                 renderCharacterHeader();
-                saveMsgEl.innerText = (result && result.justCleared)
-                    ? `기록이 저장됐어요! 🙌  🎉 레벨 클리어! 다음 레벨이 열렸어요! (Lv.${result.newCharacterLevel})`
+                saveMsgEl.innerHTML = (result && result.justCleared)
+                    ? `기록이 저장됐어요! 🙌 🎉 레벨 클리어! 다음 레벨이 열렸어요! ${charLevelBadgeHtml(result.newCharacterLevel)}`
                     : '기록이 저장됐어요! 🙌';
             } else {
                 saveMsgEl.innerText = '로그인하면 기록이 저장돼요. (홈 화면에서 로그인해보세요!)';
@@ -2850,6 +2873,12 @@
         renderPlayTurnIndicator();
     }
 
+    // 잡은 돌 개수 옆에 보여줄 작은 바둑돌 아이콘. 잡힌 쪽 색(=상대 돌 색)으로 그린다 -
+    // 내(흑) 잡은 수 옆엔 흰돌, 상대(백) 잡은 수 옆엔 검은돌이 보여야 "무엇을 잡았는지" 바로 보인다.
+    function miniStoneHtml(color) {
+        return `<span class="mini-stone ${color}"></span>`;
+    }
+
     function renderPlayBars() {
         const character = getActiveCharacter();
         const infoBar = document.getElementById('play-info-bar');
@@ -2858,10 +2887,10 @@
             infoBar.innerHTML = `
                 ${avatarHtml(character, 32)}
                 <div class="ch-info">
-                    <div class="ch-name-row">${character.name} <span class="level-badge">Lv.${level}</span></div>
+                    <div class="ch-name-row">${character.name} ${charLevelBadgeHtml(level)}</div>
                     <div class="ch-points-row">💰 ${walletBalance(character)}P</div>
                 </div>
-                <div class="play-capture-count">🎯 ${playCapturedBy.black}개 잡음</div>`;
+                <div class="play-capture-count">${miniStoneHtml('white')}${playCapturedBy.black}개 잡음</div>`;
         } else {
             infoBar.innerHTML = '';
         }
@@ -2872,7 +2901,7 @@
             : `🧑‍🤝‍🧑 ${playOpponentName}`;
         opponentBar.innerHTML = `
             <div class="op-info">${label}</div>
-            <div class="play-capture-count">🎯 ${playCapturedBy.white}개 잡음</div>`;
+            <div class="play-capture-count">${miniStoneHtml('black')}${playCapturedBy.white}개 잡음</div>`;
     }
 
     function renderPlayBoardStones() {
