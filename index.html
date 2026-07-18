@@ -98,18 +98,23 @@
         }
         .ch-icon-btn:hover { background: rgba(255,255,255,0.35); }
 
-        /* 아바타 (이모지 + 액세서리 겹치기) */
+        /* 아바타 (이모지 + 액세서리 겹치기)
+           기기/브라우저마다 이모지 폰트의 실제 그림 위치(패딩)가 달라 텍스트 이모지로는
+           위치가 흔들리므로, twemoji로 고정된 이미지(svg)로 통일해 모든 기기에서 동일하게 보이게 한다. */
+        img.emoji { height: 1em; width: 1em; vertical-align: -0.1em; display: inline-block; }
         .avatar-display { position: relative; display: inline-block; line-height: 1; }
-        .avatar-display .avatar-base { position: relative; z-index: 2; }
-        .avatar-display .acc-hat { position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%) scale(0.55); z-index: 3; }
-        .avatar-display .acc-glasses { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%) scale(0.5); z-index: 3; }
-        .avatar-display .acc-extra { position: absolute; bottom: -0.15em; right: -0.15em; transform: scale(0.5); z-index: 3; }
-        .avatar-display .acc-extra_ribbon { top: 3%; left: 50%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.5); }
-        .avatar-display .acc-extra_scarf { top: 86%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.55); }
-        .avatar-display .acc-extra_flower { top: 6%; left: 22%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.4); }
-        .avatar-display .acc-extra_butterfly { top: 8%; left: 78%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.38); }
-        .avatar-display .acc-extra_necklace { top: 82%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.42); }
-        .avatar-display .acc-top { position: absolute; bottom: -0.08em; left: 50%; transform: translateX(-50%) scale(0.95); z-index: 1; }
+        .avatar-display .avatar-base { position: relative; z-index: 2; display: inline-block; }
+        .avatar-display .acc { position: absolute; }
+        .avatar-display .acc-hat { top: -0.42em; left: 50%; transform: translateX(-50%) scale(0.55); z-index: 3; }
+        .avatar-display .acc-glasses { top: 34%; left: 50%; transform: translate(-50%, -50%) scale(0.62); z-index: 3; }
+        .avatar-display .acc-glasses_goggle { top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.62); }
+        .avatar-display .acc-top { bottom: -0.05em; left: 50%; transform: translateX(-50%) scale(1); z-index: 1; }
+        .avatar-display .acc-extra { bottom: 0; right: 0; left: auto; top: auto; transform: scale(0.4); z-index: 3; }
+        .avatar-display .acc-extra_ribbon { top: -0.06em; left: 50%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.42); }
+        .avatar-display .acc-extra_scarf { top: 85%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.5); }
+        .avatar-display .acc-extra_necklace { top: 85%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.36); }
+        .avatar-display .acc-extra_flower { top: 4%; left: 20%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.34); }
+        .avatar-display .acc-extra_butterfly { top: 14%; left: 84%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.32); }
 
         /* 캐릭터 선택 화면 */
         .character-select-list { display: flex; gap: 12px; width: 100%; margin: 14px 0; flex-wrap: wrap; justify-content: center; }
@@ -504,6 +509,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@twemoji/api@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
 
 <script>
     /* =========================================================
@@ -720,12 +726,17 @@
         const extra = eq.extra ? SHOP_ITEMS.find(i => i.id === eq.extra) : null;
         return `
             <div class="avatar-display" style="font-size:${size}px;">
-                ${top ? `<span class="acc-top">${top.emoji}</span>` : ''}
+                ${top ? `<span class="acc acc-top acc-${top.id}">${top.emoji}</span>` : ''}
                 <span class="avatar-base">${character.avatar}</span>
-                ${hat ? `<span class="acc-hat">${hat.emoji}</span>` : ''}
-                ${glasses ? `<span class="acc-glasses">${glasses.emoji}</span>` : ''}
-                ${extra ? `<span class="acc-extra acc-extra_${extra.id.replace('extra_', '')}">${extra.emoji}</span>` : ''}
+                ${hat ? `<span class="acc acc-hat acc-${hat.id}">${hat.emoji}</span>` : ''}
+                ${glasses ? `<span class="acc acc-glasses acc-${glasses.id}">${glasses.emoji}</span>` : ''}
+                ${extra ? `<span class="acc acc-extra acc-${extra.id}">${extra.emoji}</span>` : ''}
             </div>`;
+    }
+
+    // 기기마다 다른 이모지 폰트 대신 twemoji 이미지로 통일해서 렌더링한다.
+    function emojify(el) {
+        if (window.twemoji && el) twemoji.parse(el, { folder: 'svg', ext: '.svg' });
     }
 
     function renderCharacterHeader() {
@@ -743,6 +754,7 @@
             <button class="ch-icon-btn" onclick="openCharacterSelect()" title="캐릭터 전환">🔀</button>
             <button class="ch-icon-btn" onclick="openShop()" title="상점">🛍️</button>
         `;
+        emojify(header);
     }
 
     function openCharacterSelect() {
@@ -762,6 +774,7 @@
                 <div class="cc-name">${c.name}</div>
                 <div class="cc-level">Lv.${level} · 💰${walletBalance(c)}P</div>
             `;
+            emojify(card);
             card.onclick = () => selectCharacter(c.id);
             wrap.appendChild(card);
         });
@@ -792,6 +805,7 @@
             b.className = 'avatar-option-btn';
             b.type = 'button';
             b.innerText = av;
+            emojify(b);
             b.onclick = () => {
                 selectedAvatar = av;
                 document.querySelectorAll('.avatar-option-btn').forEach(x => x.classList.remove('selected'));
@@ -842,7 +856,9 @@
     function renderShop() {
         const character = getActiveCharacter();
         if (!character) return;
-        document.getElementById('shop-preview').innerHTML = avatarHtml(character, 64);
+        const shopPreview = document.getElementById('shop-preview');
+        shopPreview.innerHTML = avatarHtml(character, 64);
+        emojify(shopPreview);
         const balance = walletBalance(character);
         document.getElementById('shop-wallet').innerText = balance + 'P';
 
@@ -879,6 +895,7 @@
                     <button class="shop-item-btn${equipped ? ' equipped' : ''}" ${btnDisabled ? 'disabled' : ''}>${btnLabel}</button>
                 `;
                 if (!btnDisabled) card.querySelector('button').onclick = btnAction;
+                emojify(card);
                 grid.appendChild(card);
             });
             section.appendChild(grid);
