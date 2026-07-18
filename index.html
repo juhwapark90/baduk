@@ -314,25 +314,33 @@
         }
         .play-message { font-size: 14px; font-weight: bold; color: #d32f2f; min-height: 20px; margin-bottom: 6px; text-align: center; }
 
-        /* 대국 조작 버튼: 1행 4열, 아이콘+글자 카드형 */
+        /* 대국 조작 버튼: 1행 4열, 아이콘+글자 카드형 (평면 선 아이콘 - 이모지 대신 SVG로 그려서
+           기기마다 색/모양이 달라지는 이모지 렌더링 문제 없이 항상 똑같이 보인다) */
         .play-controls-row {
             display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
             width: 100%; margin: 8px 0 4px; box-sizing: border-box;
         }
         .play-action-btn {
+            position: relative;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 6px; padding: 12px 2px; border: none; border-radius: 12px;
-            background: #e4e4e4; box-shadow: 0 2px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.7);
+            gap: 7px; padding: 14px 2px 11px; border: 1px solid #d7d7da; border-radius: 16px;
+            background: #e9e9ec; color: #3a3a3e;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.8);
             cursor: pointer; transition: transform 0.1s ease, box-shadow 0.1s ease;
         }
         .play-action-btn:active {
             transform: translateY(1px);
-            box-shadow: 0 1px 1px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.5);
         }
-        .play-action-icon { font-size: 26px; line-height: 1; }
-        .play-action-label { font-size: 12px; font-weight: bold; color: #333; white-space: nowrap; }
-        .play-action-end { background: #e53935; box-shadow: 0 2px 3px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.25); }
-        .play-action-end .play-action-label { color: #fff; }
+        .play-action-icon { width: 27px; height: 27px; display: block; color: inherit; }
+        .play-action-label { font-size: 12.5px; font-weight: 700; color: inherit; white-space: nowrap; }
+        .play-action-end {
+            background: #dc3b32; border-color: #c33128; color: #fff;
+            box-shadow: 0 3px 5px rgba(220,59,50,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+        }
+        .play-action-sparkle {
+            position: absolute; bottom: 5px; right: 7px; font-size: 9px; color: rgba(255,255,255,0.65); line-height: 1;
+        }
         .play-mark-x {
             width: 24px; height: 24px; position: relative; pointer-events: none;
         }
@@ -537,20 +545,34 @@
 
         <div class="play-controls-row">
             <button class="play-action-btn" onclick="playUndo()">
-                <span class="play-action-icon">🔄</span>
+                <svg class="play-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round">
+                    <circle cx="12" cy="12" r="8" stroke-dasharray="42 8" transform="rotate(-40 12 12)"/>
+                    <polygon points="18.1,4.6 22.3,6.5 17.7,9.2" fill="currentColor" stroke="none"/>
+                </svg>
                 <span class="play-action-label">다시두기</span>
             </button>
             <button class="play-action-btn" onclick="playPass()">
-                <span class="play-action-icon">⏩</span>
+                <svg class="play-action-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 5v14l9-7-9-7z"/>
+                    <path d="M13 5v14l9-7-9-7z"/>
+                </svg>
                 <span class="play-action-label">패스</span>
             </button>
             <button class="play-action-btn" onclick="playTakeback()">
-                <span class="play-action-icon">⏪</span>
+                <svg class="play-action-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21 5v14l-9-7 9-7z"/>
+                    <path d="M11 5v14l-9-7 9-7z"/>
+                </svg>
                 <span class="play-action-label">무르기</span>
             </button>
             <button class="play-action-btn play-action-end" onclick="playEndGame()">
-                <span class="play-action-icon">🏁</span>
+                <svg class="play-action-icon" viewBox="0 0 24 24">
+                    <line x1="5" y1="3" x2="5" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <rect x="6" y="3" width="6" height="5" fill="currentColor"/>
+                    <rect x="12" y="8" width="6" height="5" fill="currentColor"/>
+                </svg>
                 <span class="play-action-label">종료</span>
+                <span class="play-action-sparkle">✦</span>
             </button>
         </div>
 
