@@ -302,6 +302,7 @@
             display: flex; align-items: center; gap: 10px; margin-bottom: 10px; box-sizing: border-box; width: 100%;
         }
         .play-info-bar .ch-info, .play-opponent-bar .op-info { flex: 1; text-align: left; }
+        .play-capture-count { font-size: 12px; font-weight: bold; color: #2c5e43; white-space: nowrap; }
         .play-turn-indicator {
             font-size: 15px; font-weight: bold; color: #2c5e43; margin-bottom: 10px; text-align: center;
         }
@@ -2689,7 +2690,24 @@
         return {
             blackScore: blackStones + blackTerritory,
             whiteScore: whiteStones + whiteTerritory,
+            blackTerritory, whiteTerritory, blackStones, whiteStones,
             territoryCells
+        };
+    }
+
+    // 대국 종료 시 실제 승부를 가르는 계가: 한국/일본 바둑처럼 집(둘러싼 빈 칸) + 잡은 돌 수로 계산한다.
+    // (위 computePlayScore의 blackScore/whiteScore는 AI가 국면을 대충 평가할 때 쓰는 area 방식 - 판에
+    // 남은 돌 개수도 점수로 치는데, 그건 "잡은 돌 자체"가 점수에 안 보여서 이 결과 화면용으로는 안 맞다.)
+    function computeFinalScore(board, capturedBy) {
+        const area = computePlayScore(board);
+        return {
+            blackTerritory: area.blackTerritory,
+            whiteTerritory: area.whiteTerritory,
+            blackCaptures: capturedBy.black,
+            whiteCaptures: capturedBy.white,
+            blackScore: area.blackTerritory + capturedBy.black,
+            whiteScore: area.whiteTerritory + capturedBy.white,
+            territoryCells: area.territoryCells
         };
     }
 
@@ -2776,7 +2794,8 @@
                 <div class="ch-info">
                     <div class="ch-name-row">${character.name} <span class="level-badge">Lv.${level}</span></div>
                     <div class="ch-points-row">💰 ${walletBalance(character)}P</div>
-                </div>`;
+                </div>
+                <div class="play-capture-count">🎯 ${playCapturedBy.black}개 잡음</div>`;
         } else {
             infoBar.innerHTML = '';
         }
@@ -2785,7 +2804,9 @@
         const label = playMode === 'ai'
             ? `🤖 AI (${AI_DIFFICULTY_LABEL[playAiDifficulty] || ''})`
             : `🧑‍🤝‍🧑 ${playOpponentName}`;
-        opponentBar.innerHTML = `<div class="op-info">${label}</div>`;
+        opponentBar.innerHTML = `
+            <div class="op-info">${label}</div>
+            <div class="play-capture-count">🎯 ${playCapturedBy.white}개 잡음</div>`;
     }
 
     function renderPlayBoardStones() {
@@ -2832,6 +2853,7 @@
         playTurn = playTurn === 'black' ? 'white' : 'black';
         renderPlayBoardStones();
         renderPlayTurnIndicator();
+        if (result.captured.length > 0) renderPlayBars(); // 잡은 돌 수가 바뀌었을 때만 다시 그린다
 
         if (playMode === 'ai' && playTurn === 'white') {
             setTimeout(aiTakeTurn, 450);
@@ -2847,6 +2869,7 @@
         document.getElementById('play-message').innerText = '';
         renderPlayBoardStones();
         renderPlayTurnIndicator();
+        renderPlayBars();
     }
 
     // 무름: 방금 둔 수와 그 이전 수까지, 두 수를 함께 되돌린다.
@@ -2859,6 +2882,7 @@
         document.getElementById('play-message').innerText = '';
         renderPlayBoardStones();
         renderPlayTurnIndicator();
+        renderPlayBars();
     }
 
     function playPass() {
@@ -2874,7 +2898,8 @@
 
     function playEndGame() {
         playGameEnded = true;
-        const score = computePlayScore(playBoard);
+        // 한국식 계가: 집 + 잡은 돌 수로 승부를 가른다 (판에 남은 돌 개수는 점수에 안 들어간다).
+        const score = computeFinalScore(playBoard, playCapturedBy);
         score.territoryCells.forEach(({ x, y }) => {
             document.getElementById(`play-pos-${x}-${y}`).innerHTML = '<div class="play-mark-x"></div>';
         });
@@ -2892,8 +2917,8 @@
             : `⚪ ${whiteLabel}이(가) ${diff}집 차이로 승리!`;
 
         document.getElementById('play-end-summary').innerHTML = `
-            <div class="modal-score-row">⚫ ${blackLabel}: ${score.blackScore}집</div>
-            <div class="modal-score-row">⚪ ${whiteLabel}: ${score.whiteScore}집</div>
+            <div class="modal-score-row">⚫ ${blackLabel}: 집 ${score.blackTerritory} + 잡은 돌 ${score.blackCaptures} = ${score.blackScore}집</div>
+            <div class="modal-score-row">⚪ ${whiteLabel}: 집 ${score.whiteTerritory} + 잡은 돌 ${score.whiteCaptures} = ${score.whiteScore}집</div>
             <div class="modal-winner-row">${winnerText}</div>
         `;
         document.getElementById('play-end-popup').classList.add('active');
