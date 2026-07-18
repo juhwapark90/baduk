@@ -103,6 +103,8 @@
         .avatar-display .acc-hat { position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%) scale(0.55); }
         .avatar-display .acc-glasses { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%) scale(0.5); }
         .avatar-display .acc-extra { position: absolute; bottom: -0.15em; right: -0.15em; transform: scale(0.5); }
+        .avatar-display .acc-extra_ribbon { top: 3%; left: 50%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.5); }
+        .avatar-display .acc-extra_scarf { top: 86%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.55); }
 
         /* 캐릭터 선택 화면 */
         .character-select-list { display: flex; gap: 12px; width: 100%; margin: 14px 0; flex-wrap: wrap; justify-content: center; }
@@ -704,7 +706,7 @@
                 <span class="avatar-base">${character.avatar}</span>
                 ${hat ? `<span class="acc-hat">${hat.emoji}</span>` : ''}
                 ${glasses ? `<span class="acc-glasses">${glasses.emoji}</span>` : ''}
-                ${extra ? `<span class="acc-extra">${extra.emoji}</span>` : ''}
+                ${extra ? `<span class="acc-extra acc-extra_${extra.id.replace('extra_', '')}">${extra.emoji}</span>` : ''}
             </div>`;
     }
 
