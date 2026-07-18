@@ -737,9 +737,9 @@
     const AVATAR_MOUTH = ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15', 'variant16', 'variant17', 'variant18', 'variant19', 'variant20', 'variant21', 'variant22', 'variant23', 'variant24', 'variant25', 'variant26', 'variant27', 'variant28', 'variant29', 'variant30'];
 
     const CC_OPTION_DEFS = [
+        { key: 'skinColor', label: '피부색', pool: AVATAR_SKIN_COLORS, kind: 'color' },
         { key: 'hair', label: '헤어스타일', pool: AVATAR_HAIR, kind: 'thumb' },
         { key: 'hairColor', label: '머리색', pool: AVATAR_HAIR_COLORS, kind: 'color' },
-        { key: 'skinColor', label: '피부색', pool: AVATAR_SKIN_COLORS, kind: 'color' },
         { key: 'eyes', label: '눈', pool: AVATAR_EYES, kind: 'thumb' },
         { key: 'eyebrows', label: '눈썹', pool: AVATAR_EYEBROWS, kind: 'thumb' },
         { key: 'mouth', label: '입', pool: AVATAR_MOUTH, kind: 'thumb' }
@@ -752,35 +752,35 @@
     }
 
     const SHOP_ITEMS = [
-        ...buildVariantShopItems('hair', AVATAR_HAIR, '헤어스타일', 15),
-        ...buildVariantShopItems('hairColor', AVATAR_HAIR_COLORS, '머리색', 10),
-        ...buildVariantShopItems('skinColor', AVATAR_SKIN_COLORS, '피부색', 10),
-        ...buildVariantShopItems('eyes', AVATAR_EYES, '눈 스타일', 12),
-        ...buildVariantShopItems('eyebrows', AVATAR_EYEBROWS, '눈썹 스타일', 10),
-        ...buildVariantShopItems('mouth', AVATAR_MOUTH, '입 스타일', 12),
-        { id: 'glasses_1', slot: 'glasses', variant: 'variant01', name: '안경 스타일 1', price: 30 },
-        { id: 'glasses_2', slot: 'glasses', variant: 'variant02', name: '안경 스타일 2', price: 30 },
-        { id: 'glasses_3', slot: 'glasses', variant: 'variant03', name: '안경 스타일 3', price: 40 },
-        { id: 'glasses_4', slot: 'glasses', variant: 'variant04', name: '안경 스타일 4', price: 40 },
-        { id: 'glasses_5', slot: 'glasses', variant: 'variant05', name: '안경 스타일 5', price: 50 },
-        { id: 'earrings_1', slot: 'earrings', variant: 'variant01', name: '귀걸이 스타일 1', price: 25 },
-        { id: 'earrings_2', slot: 'earrings', variant: 'variant02', name: '귀걸이 스타일 2', price: 30 },
-        { id: 'earrings_3', slot: 'earrings', variant: 'variant03', name: '귀걸이 스타일 3', price: 30 },
-        { id: 'earrings_4', slot: 'earrings', variant: 'variant04', name: '귀걸이 스타일 4', price: 35 },
-        { id: 'earrings_5', slot: 'earrings', variant: 'variant05', name: '귀걸이 스타일 5', price: 35 },
-        { id: 'earrings_6', slot: 'earrings', variant: 'variant06', name: '귀걸이 스타일 6', price: 40 },
-        { id: 'feature_blush', slot: 'feature', variant: 'blush', name: '볼터치', price: 20 },
-        { id: 'feature_freckles', slot: 'feature', variant: 'freckles', name: '주근깨', price: 20 },
-        { id: 'feature_birthmark', slot: 'feature', variant: 'birthmark', name: '뷰티마크', price: 20 },
-        { id: 'feature_mustache', slot: 'feature', variant: 'mustache', name: '콧수염', price: 25 }
+        ...buildVariantShopItems('skinColor', AVATAR_SKIN_COLORS, '피부색', 40),
+        ...buildVariantShopItems('hair', AVATAR_HAIR, '헤어스타일', 60),
+        ...buildVariantShopItems('hairColor', AVATAR_HAIR_COLORS, '머리색', 40),
+        ...buildVariantShopItems('eyes', AVATAR_EYES, '눈 스타일', 48),
+        ...buildVariantShopItems('eyebrows', AVATAR_EYEBROWS, '눈썹 스타일', 40),
+        ...buildVariantShopItems('mouth', AVATAR_MOUTH, '입 스타일', 48),
+        { id: 'glasses_1', slot: 'glasses', variant: 'variant01', name: '안경 스타일 1', price: 120 },
+        { id: 'glasses_2', slot: 'glasses', variant: 'variant02', name: '안경 스타일 2', price: 120 },
+        { id: 'glasses_3', slot: 'glasses', variant: 'variant03', name: '안경 스타일 3', price: 160 },
+        { id: 'glasses_4', slot: 'glasses', variant: 'variant04', name: '안경 스타일 4', price: 160 },
+        { id: 'glasses_5', slot: 'glasses', variant: 'variant05', name: '안경 스타일 5', price: 200 },
+        { id: 'earrings_1', slot: 'earrings', variant: 'variant01', name: '귀걸이 스타일 1', price: 100 },
+        { id: 'earrings_2', slot: 'earrings', variant: 'variant02', name: '귀걸이 스타일 2', price: 120 },
+        { id: 'earrings_3', slot: 'earrings', variant: 'variant03', name: '귀걸이 스타일 3', price: 120 },
+        { id: 'earrings_4', slot: 'earrings', variant: 'variant04', name: '귀걸이 스타일 4', price: 140 },
+        { id: 'earrings_5', slot: 'earrings', variant: 'variant05', name: '귀걸이 스타일 5', price: 140 },
+        { id: 'earrings_6', slot: 'earrings', variant: 'variant06', name: '귀걸이 스타일 6', price: 160 },
+        { id: 'feature_blush', slot: 'feature', variant: 'blush', name: '볼터치', price: 80 },
+        { id: 'feature_freckles', slot: 'feature', variant: 'freckles', name: '주근깨', price: 80 },
+        { id: 'feature_birthmark', slot: 'feature', variant: 'birthmark', name: '뷰티마크', price: 80 },
+        { id: 'feature_mustache', slot: 'feature', variant: 'mustache', name: '콧수염', price: 100 }
     ];
     const SLOT_LABELS = {
         hair: '헤어스타일', hairColor: '머리색', skinColor: '피부색',
         eyes: '눈', eyebrows: '눈썹', mouth: '입',
-        glasses: '안경', earrings: '귀걸이', feature: '표정 꾸미기'
+        glasses: '안경', earrings: '귀걸이', feature: '볼 꾸미기'
     };
     // 항상 값이 있어야 하는 슬롯(얼굴 자체) - 액세서리와 달리 "해제"가 없다.
-    const REQUIRED_SLOTS = ['hair', 'hairColor', 'skinColor', 'eyes', 'eyebrows', 'mouth'];
+    const REQUIRED_SLOTS = ['skinColor', 'hair', 'hairColor', 'eyes', 'eyebrows', 'mouth'];
     const OPTIONAL_SLOTS = ['glasses', 'earrings', 'feature'];
 
     function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
