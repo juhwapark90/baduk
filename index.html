@@ -718,12 +718,13 @@
     /* =========================================================
        캐릭터 (Dicebear adventurer 아바타 / 헤더 / 선택 / 생성 / 상점)
     ========================================================= */
+    // adventurer 스타일이 지원하는 값 거의 전부를 그대로 노출한다(다양성 우선).
     const AVATAR_SKIN_COLORS = ['f2d3b1', 'ecad80', '9e5622', '763900'];
     const AVATAR_HAIR_COLORS = ['0e0e0e', '562306', '6a4e35', '796a45', 'b9a05f', 'e5d7a3', 'ac6511', 'cb6820', 'ab2a18', 'afafaf', '3eac2c', '85c2c6', 'dba3be', '592454'];
-    const AVATAR_HAIR = ['short16', 'short13', 'short09', 'short05', 'short02', 'long18', 'long14', 'long10', 'long06', 'long03', 'long26', 'long23'];
-    const AVATAR_EYES = ['variant26', 'variant24', 'variant21', 'variant19', 'variant16', 'variant13', 'variant11', 'variant08', 'variant06', 'variant03'];
-    const AVATAR_EYEBROWS = ['variant10', 'variant09', 'variant07', 'variant05', 'variant03', 'variant01', 'variant14', 'variant12'];
-    const AVATAR_MOUTH = ['variant30', 'variant27', 'variant24', 'variant21', 'variant18', 'variant15', 'variant12', 'variant09', 'variant06', 'variant03'];
+    const AVATAR_HAIR = ['long01', 'long02', 'long03', 'long04', 'long05', 'long06', 'long07', 'long08', 'long09', 'long10', 'long11', 'long12', 'long13', 'long14', 'long15', 'long16', 'long17', 'long18', 'long19', 'long20', 'long21', 'long22', 'long23', 'long24', 'long25', 'long26', 'short01', 'short02', 'short03', 'short04', 'short05', 'short06', 'short07', 'short08', 'short09', 'short10', 'short11', 'short12', 'short13', 'short14', 'short15', 'short16', 'short17', 'short18', 'short19'];
+    const AVATAR_EYES = ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15', 'variant16', 'variant17', 'variant18', 'variant19', 'variant20', 'variant21', 'variant22', 'variant23', 'variant24', 'variant25', 'variant26'];
+    const AVATAR_EYEBROWS = ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15'];
+    const AVATAR_MOUTH = ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15', 'variant16', 'variant17', 'variant18', 'variant19', 'variant20', 'variant21', 'variant22', 'variant23', 'variant24', 'variant25', 'variant26', 'variant27', 'variant28', 'variant29', 'variant30'];
 
     const CC_OPTION_DEFS = [
         { key: 'hair', label: '헤어스타일', pool: AVATAR_HAIR, kind: 'thumb' },
@@ -744,9 +745,12 @@
         { id: 'earrings_2', slot: 'earrings', variant: 'variant02', name: '귀걸이 스타일 2', price: 30 },
         { id: 'earrings_3', slot: 'earrings', variant: 'variant03', name: '귀걸이 스타일 3', price: 30 },
         { id: 'earrings_4', slot: 'earrings', variant: 'variant04', name: '귀걸이 스타일 4', price: 35 },
+        { id: 'earrings_5', slot: 'earrings', variant: 'variant05', name: '귀걸이 스타일 5', price: 35 },
+        { id: 'earrings_6', slot: 'earrings', variant: 'variant06', name: '귀걸이 스타일 6', price: 40 },
         { id: 'feature_blush', slot: 'feature', variant: 'blush', name: '볼터치', price: 20 },
         { id: 'feature_freckles', slot: 'feature', variant: 'freckles', name: '주근깨', price: 20 },
-        { id: 'feature_birthmark', slot: 'feature', variant: 'birthmark', name: '뷰티마크', price: 20 }
+        { id: 'feature_birthmark', slot: 'feature', variant: 'birthmark', name: '뷰티마크', price: 20 },
+        { id: 'feature_mustache', slot: 'feature', variant: 'mustache', name: '콧수염', price: 25 }
     ];
     const SLOT_LABELS = { glasses: '안경', earrings: '귀걸이', feature: '표정 꾸미기' };
 
