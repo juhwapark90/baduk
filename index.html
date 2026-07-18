@@ -27,15 +27,15 @@
     })();
     </script>
     <script>
-        // dicebear-avataaars.js 로드가 끝날 때까지 아바타를 그리는 코드들이 기다릴 수 있도록
+        // dicebear-adventurer.js 로드가 끝날 때까지 아바타를 그리는 코드들이 기다릴 수 있도록
         // 약속(Promise)을 미리 만들어둔다. (실제 완료 신호는 아래 module 스크립트에서 보낸다)
         window.dicebearReadyPromise = new Promise(function (resolve) { window.__resolveDicebearReady = resolve; });
     </script>
     <script type="module">
         import { createAvatar } from './lib/dicebear-core.js';
-        import * as avataaars from './lib/dicebear-avataaars.js';
+        import * as adventurer from './lib/dicebear-adventurer.js';
         window.__dicebearCreateAvatar = function (options) {
-            return createAvatar(avataaars, options).toString();
+            return createAvatar(adventurer, options).toString();
         };
         window.__resolveDicebearReady();
     </script>
@@ -111,9 +111,9 @@
         }
         .ch-icon-btn:hover { background: rgba(255,255,255,0.35); }
 
-        /* 아바타: Dicebear avataaars 스타일 SVG를 옵션 조합으로 그린다(헤어/모자/눈/입/옷 등).
+        /* 아바타: Dicebear adventurer 스타일 SVG를 옵션 조합으로 그린다.
            고정 좌표계의 벡터라 텍스트 이모지처럼 기기마다 위치/모양이 흔들리는 문제가 없고,
-           조합 폭이 넓으면서 상반신 의상까지 포함된다. */
+           머리스타일/눈/입 등 조합 폭이 훨씬 넓다. */
         .avatar-display { display: inline-flex; line-height: 1; }
         .avatar-display svg { display: block; }
 
@@ -726,80 +726,74 @@
     });
 
     /* =========================================================
-       캐릭터 (Dicebear avataaars 아바타 / 헤더 / 선택 / 생성 / 상점)
+       캐릭터 (Dicebear adventurer 아바타 / 헤더 / 선택 / 생성 / 상점)
     ========================================================= */
-    // avataaars 스타일이 지원하는 값 거의 전부를 그대로 노출한다(다양성 + 상반신 의상 우선).
-    // "top"은 헤어스타일과 모자가 한 슬롯에 섞여 있는 avataaars 고유 구조다(하나를 고르면 나머지는 안 보임).
-    const AVATAR_TOP = ['hat', 'hijab', 'turban', 'winterHat1', 'winterHat02', 'winterHat03', 'winterHat04', 'bob', 'bun', 'curly', 'curvy', 'dreads', 'frida', 'fro', 'froBand', 'longButNotTooLong', 'miaWallace', 'shavedSides', 'straight01', 'straight02', 'straightAndStrand', 'dreads01', 'dreads02', 'frizzle', 'shaggy', 'shaggyMullet', 'shortCurly', 'shortFlat', 'shortRound', 'shortWaved', 'sides', 'theCaesar', 'theCaesarAndSidePart', 'bigHair'];
-    const AVATAR_HAIR_COLORS = ['a55728', '2c1b18', 'b58143', 'd6b370', '724133', '4a312c', 'f59797', 'ecdcbf', 'c93305', 'e8e1e1'];
-    const AVATAR_HAT_COLORS = ['262e33', '65c9ff', '5199e4', '25557c', 'e6e6e6', '929598', '3c4f5c', 'b1e2ff', 'a7ffc4', 'ffdeb5', 'ffafb9', 'ffffb1', 'ff488e', 'ff5c5c', 'ffffff'];
-    const AVATAR_SKIN_COLORS = ['614335', 'd08b5b', 'ae5d29', 'edb98a', 'ffdbb4', 'fd9841', 'f8d25c'];
-    const AVATAR_EYES = ['closed', 'cry', 'default', 'eyeRoll', 'happy', 'hearts', 'side', 'squint', 'surprised', 'winkWacky', 'wink', 'xDizzy'];
-    const AVATAR_EYEBROWS = ['angryNatural', 'defaultNatural', 'flatNatural', 'frownNatural', 'raisedExcitedNatural', 'sadConcernedNatural', 'unibrowNatural', 'upDownNatural', 'angry', 'default', 'raisedExcited', 'sadConcerned', 'upDown'];
-    const AVATAR_MOUTH = ['concerned', 'default', 'disbelief', 'eating', 'grimace', 'sad', 'screamOpen', 'serious', 'smile', 'tongue', 'twinkle', 'vomit'];
-    const AVATAR_CLOTHING = ['blazerAndShirt', 'blazerAndSweater', 'collarAndSweater', 'graphicShirt', 'hoodie', 'overall', 'shirtCrewNeck', 'shirtScoopNeck', 'shirtVNeck'];
-    const AVATAR_CLOTHES_COLORS = ['262e33', '65c9ff', '5199e4', '25557c', 'e6e6e6', '929598', '3c4f5c', 'b1e2ff', 'a7ffc4', 'ffafb9', 'ffffb1', 'ff488e', 'ff5c5c', 'ffffff'];
-    const AVATAR_CLOTHING_GRAPHIC = ['bat', 'bear', 'cumbia', 'deer', 'diamond', 'hola', 'pizza', 'resist', 'skull', 'skullOutline'];
-    const AVATAR_ACCESSORIES = ['kurt', 'prescription01', 'prescription02', 'round', 'sunglasses', 'wayfarers', 'eyepatch'];
-    const AVATAR_FACIAL_HAIR = ['beardLight', 'beardMajestic', 'beardMedium', 'moustacheFancy', 'moustacheMagnum'];
+    // adventurer 스타일이 지원하는 값 거의 전부를 그대로 노출한다(다양성 우선).
+    const AVATAR_SKIN_COLORS = ['f2d3b1', 'ecad80', '9e5622', '763900'];
+    const AVATAR_HAIR_COLORS = ['0e0e0e', '562306', '6a4e35', '796a45', 'b9a05f', 'e5d7a3', 'ac6511', 'cb6820', 'ab2a18', 'afafaf', '3eac2c', '85c2c6', 'dba3be', '592454'];
+    const AVATAR_HAIR = ['long01', 'long02', 'long03', 'long04', 'long05', 'long06', 'long07', 'long08', 'long09', 'long10', 'long11', 'long12', 'long13', 'long14', 'long15', 'long16', 'long17', 'long18', 'long19', 'long20', 'long21', 'long22', 'long23', 'long24', 'long25', 'long26', 'short01', 'short02', 'short03', 'short04', 'short05', 'short06', 'short07', 'short08', 'short09', 'short10', 'short11', 'short12', 'short13', 'short14', 'short15', 'short16', 'short17', 'short18', 'short19'];
+    const AVATAR_EYES = ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15', 'variant16', 'variant17', 'variant18', 'variant19', 'variant20', 'variant21', 'variant22', 'variant23', 'variant24', 'variant25', 'variant26'];
+    const AVATAR_EYEBROWS = ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15'];
+    const AVATAR_MOUTH = ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15', 'variant16', 'variant17', 'variant18', 'variant19', 'variant20', 'variant21', 'variant22', 'variant23', 'variant24', 'variant25', 'variant26', 'variant27', 'variant28', 'variant29', 'variant30'];
 
-    // slot 이름 -> Dicebear 옵션 배열 (기본값 계산/검증에 공용으로 쓴다)
-    const AVATAR_POOLS = {
-        top: AVATAR_TOP, hairColor: AVATAR_HAIR_COLORS, hatColor: AVATAR_HAT_COLORS, skinColor: AVATAR_SKIN_COLORS,
-        eyes: AVATAR_EYES, eyebrows: AVATAR_EYEBROWS, mouth: AVATAR_MOUTH,
-        clothing: AVATAR_CLOTHING, clothesColor: AVATAR_CLOTHES_COLORS, clothingGraphic: AVATAR_CLOTHING_GRAPHIC,
-        accessories: AVATAR_ACCESSORIES, facialHair: AVATAR_FACIAL_HAIR
-    };
-    // 항상 값이 있어야 하는 슬롯(얼굴/옷 자체) - 액세서리와 달리 "해제"가 없다.
-    const REQUIRED_SLOTS = ['top', 'hairColor', 'hatColor', 'skinColor', 'eyes', 'eyebrows', 'mouth', 'clothing', 'clothesColor', 'clothingGraphic'];
-    const OPTIONAL_SLOTS = ['accessories', 'facialHair'];
-    const SLOT_LABELS = {
-        top: '헤어스타일 · 모자', hairColor: '머리색', hatColor: '모자색', skinColor: '피부색',
-        eyes: '눈', eyebrows: '눈썹', mouth: '입',
-        clothing: '옷', clothesColor: '옷 색깔', clothingGraphic: '그래픽 프린트',
-        accessories: '안경', facialHair: '수염'
-    };
-
-    // 캐릭터 생성 화면에서 직접 고르게 할 항목(그래픽 프린트는 "옷"이 graphicShirt일 때만 보이므로 생성 화면에서는 뺀다).
     const CC_OPTION_DEFS = [
-        { key: 'top', label: '헤어스타일 · 모자', pool: AVATAR_TOP, kind: 'thumb' },
+        { key: 'hair', label: '헤어스타일', pool: AVATAR_HAIR, kind: 'thumb' },
         { key: 'hairColor', label: '머리색', pool: AVATAR_HAIR_COLORS, kind: 'color' },
-        { key: 'hatColor', label: '모자색', pool: AVATAR_HAT_COLORS, kind: 'color' },
         { key: 'skinColor', label: '피부색', pool: AVATAR_SKIN_COLORS, kind: 'color' },
         { key: 'eyes', label: '눈', pool: AVATAR_EYES, kind: 'thumb' },
         { key: 'eyebrows', label: '눈썹', pool: AVATAR_EYEBROWS, kind: 'thumb' },
-        { key: 'mouth', label: '입', pool: AVATAR_MOUTH, kind: 'thumb' },
-        { key: 'clothing', label: '옷', pool: AVATAR_CLOTHING, kind: 'thumb' },
-        { key: 'clothesColor', label: '옷 색깔', pool: AVATAR_CLOTHES_COLORS, kind: 'color' }
+        { key: 'mouth', label: '입', pool: AVATAR_MOUTH, kind: 'thumb' }
     ];
 
-    // 얼굴/옷 각 부위도 액세서리와 동일하게 "상점 아이템"으로 다룬다.
+    // 얼굴 각 부위(헤어/눈/눈썹/입/머리색/피부색)도 액세서리와 동일하게 "상점 아이템"으로 다룬다.
     // 캐릭터 생성 때 고른 값만 처음부터 무료로 소유하고, 나머지는 상점에서 포인트로 사서 바꿔 낄 수 있다.
     function buildVariantShopItems(slot, pool, label, price) {
         return pool.map((variant, i) => ({ id: slot + '_' + variant, slot: slot, variant: variant, name: label + ' ' + (i + 1), price: price }));
     }
 
     const SHOP_ITEMS = [
-        ...buildVariantShopItems('top', AVATAR_TOP, '헤어스타일·모자', 15),
+        ...buildVariantShopItems('hair', AVATAR_HAIR, '헤어스타일', 15),
         ...buildVariantShopItems('hairColor', AVATAR_HAIR_COLORS, '머리색', 10),
-        ...buildVariantShopItems('hatColor', AVATAR_HAT_COLORS, '모자색', 10),
         ...buildVariantShopItems('skinColor', AVATAR_SKIN_COLORS, '피부색', 10),
         ...buildVariantShopItems('eyes', AVATAR_EYES, '눈 스타일', 12),
         ...buildVariantShopItems('eyebrows', AVATAR_EYEBROWS, '눈썹 스타일', 10),
         ...buildVariantShopItems('mouth', AVATAR_MOUTH, '입 스타일', 12),
-        ...buildVariantShopItems('clothing', AVATAR_CLOTHING, '옷', 20),
-        ...buildVariantShopItems('clothesColor', AVATAR_CLOTHES_COLORS, '옷 색깔', 10),
-        ...buildVariantShopItems('clothingGraphic', AVATAR_CLOTHING_GRAPHIC, '그래픽 프린트', 15),
-        ...buildVariantShopItems('accessories', AVATAR_ACCESSORIES, '안경', 30),
-        ...buildVariantShopItems('facialHair', AVATAR_FACIAL_HAIR, '수염', 20)
+        { id: 'glasses_1', slot: 'glasses', variant: 'variant01', name: '안경 스타일 1', price: 30 },
+        { id: 'glasses_2', slot: 'glasses', variant: 'variant02', name: '안경 스타일 2', price: 30 },
+        { id: 'glasses_3', slot: 'glasses', variant: 'variant03', name: '안경 스타일 3', price: 40 },
+        { id: 'glasses_4', slot: 'glasses', variant: 'variant04', name: '안경 스타일 4', price: 40 },
+        { id: 'glasses_5', slot: 'glasses', variant: 'variant05', name: '안경 스타일 5', price: 50 },
+        { id: 'earrings_1', slot: 'earrings', variant: 'variant01', name: '귀걸이 스타일 1', price: 25 },
+        { id: 'earrings_2', slot: 'earrings', variant: 'variant02', name: '귀걸이 스타일 2', price: 30 },
+        { id: 'earrings_3', slot: 'earrings', variant: 'variant03', name: '귀걸이 스타일 3', price: 30 },
+        { id: 'earrings_4', slot: 'earrings', variant: 'variant04', name: '귀걸이 스타일 4', price: 35 },
+        { id: 'earrings_5', slot: 'earrings', variant: 'variant05', name: '귀걸이 스타일 5', price: 35 },
+        { id: 'earrings_6', slot: 'earrings', variant: 'variant06', name: '귀걸이 스타일 6', price: 40 },
+        { id: 'feature_blush', slot: 'feature', variant: 'blush', name: '볼터치', price: 20 },
+        { id: 'feature_freckles', slot: 'feature', variant: 'freckles', name: '주근깨', price: 20 },
+        { id: 'feature_birthmark', slot: 'feature', variant: 'birthmark', name: '뷰티마크', price: 20 },
+        { id: 'feature_mustache', slot: 'feature', variant: 'mustache', name: '콧수염', price: 25 }
     ];
+    const SLOT_LABELS = {
+        hair: '헤어스타일', hairColor: '머리색', skinColor: '피부색',
+        eyes: '눈', eyebrows: '눈썹', mouth: '입',
+        glasses: '안경', earrings: '귀걸이', feature: '표정 꾸미기'
+    };
+    // 항상 값이 있어야 하는 슬롯(얼굴 자체) - 액세서리와 달리 "해제"가 없다.
+    const REQUIRED_SLOTS = ['hair', 'hairColor', 'skinColor', 'eyes', 'eyebrows', 'mouth'];
+    const OPTIONAL_SLOTS = ['glasses', 'earrings', 'feature'];
 
     function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
     function randomAvatarOptions() {
-        const o = {};
-        REQUIRED_SLOTS.forEach(slot => { o[slot] = pickRandom(AVATAR_POOLS[slot]); });
-        return o;
+        return {
+            skinColor: pickRandom(AVATAR_SKIN_COLORS),
+            hair: pickRandom(AVATAR_HAIR),
+            hairColor: pickRandom(AVATAR_HAIR_COLORS),
+            eyes: pickRandom(AVATAR_EYES),
+            eyebrows: pickRandom(AVATAR_EYEBROWS),
+            mouth: pickRandom(AVATAR_MOUTH)
+        };
     }
 
     // 같은 seed는 항상 같은 값을 내야 하므로 Math.random 대신 문자열 해시로 인덱스를 고른다.
@@ -811,40 +805,52 @@
 
     function defaultAvatarOptionsFor(seed) {
         const h = hashStr(String(seed));
-        const o = {};
-        REQUIRED_SLOTS.forEach((slot, i) => { const pool = AVATAR_POOLS[slot]; o[slot] = pool[(h + i + 1) % pool.length]; });
-        return o;
+        const pick = (arr, salt) => arr[(h + salt) % arr.length];
+        return {
+            skinColor: pick(AVATAR_SKIN_COLORS, 1),
+            hair: pick(AVATAR_HAIR, 2),
+            hairColor: pick(AVATAR_HAIR_COLORS, 3),
+            eyes: pick(AVATAR_EYES, 4),
+            eyebrows: pick(AVATAR_EYEBROWS, 5),
+            mouth: pick(AVATAR_MOUTH, 6)
+        };
     }
 
     function equippedItemIdsFor(base) {
-        const eq = {};
-        REQUIRED_SLOTS.forEach(slot => { eq[slot] = slot + '_' + base[slot]; });
-        OPTIONAL_SLOTS.forEach(slot => { eq[slot] = null; });
-        return eq;
+        return {
+            hair: 'hair_' + base.hair,
+            hairColor: 'hairColor_' + base.hairColor,
+            skinColor: 'skinColor_' + base.skinColor,
+            eyes: 'eyes_' + base.eyes,
+            eyebrows: 'eyebrows_' + base.eyebrows,
+            mouth: 'mouth_' + base.mouth,
+            glasses: null, earrings: null, feature: null
+        };
     }
 
-    // 지금 형식의 버전 표시. 이 값이 다르면(예전 이모지/avataaars-illust/adventurer 형식 등)
-    // 겉모습을 새로 랜덤 배정하고 처음부터 시작한다 - 예전 값 체계가 서로 호환되지 않기 때문.
-    const AVATAR_FORMAT_VERSION = 'avataaars-v1';
-
+    // 예전 형식(이모지 조합, avataaars 파츠 조합, 혹은 얼굴이 상점 아이템화되기 전의 Dicebear 형식)으로
+    // 저장된 캐릭터를 지금 형식(얼굴 부위 전부가 상점 아이템 id로 equipped/owned에 들어가는 형식)으로 옮긴다.
+    // 이미 새 형식이면 손대지 않는다.
     function ensureAvatarOptions(character) {
-        if (character.avatarFormat !== AVATAR_FORMAT_VERSION) {
-            const base = defaultAvatarOptionsFor(character.id || character.name || 'raon');
+        const alreadyNewFormat = character.equipped && character.equipped.hair && !character.avatarOptions && typeof character.avatar !== 'string';
+        if (!alreadyNewFormat) {
+            const base = character.avatarOptions || defaultAvatarOptionsFor(character.id || character.name || 'raon');
             character.equipped = equippedItemIdsFor(base);
-            character.owned = REQUIRED_SLOTS.map(slot => character.equipped[slot]);
+            character.owned = [character.equipped.hair, character.equipped.hairColor, character.equipped.skinColor,
+                character.equipped.eyes, character.equipped.eyebrows, character.equipped.mouth];
             character.freeItemIds = character.owned.slice();
-            character.avatarFormat = AVATAR_FORMAT_VERSION;
             delete character.avatar;
             delete character.avatarOptions;
+            delete character.avatarFormat;
         }
         if (!character.owned) character.owned = [];
         if (!character.freeItemIds) character.freeItemIds = [];
         return character;
     }
 
-    function renderCharacterSvg(options, size) {
+    function renderAdventurerSvg(options, size) {
         if (!window.__dicebearCreateAvatar) return `<div style="width:${size}px;height:${size}px;"></div>`;
-        return window.__dicebearCreateAvatar(Object.assign({ size: size, backgroundColor: [], topProbability: 100, accessoriesProbability: 0, facialHairProbability: 0 }, options));
+        return window.__dicebearCreateAvatar(Object.assign({ size: size }, options));
     }
 
     function ccFullOptions() { return ccOptionsWith(null, null); }
@@ -852,9 +858,12 @@
     function ccOptionsWith(overrideKey, overrideValue) {
         const a = Object.assign({}, ccAvatarOptions);
         if (overrideKey) a[overrideKey] = overrideValue;
-        const opts = { seed: 'preview' };
-        REQUIRED_SLOTS.forEach(slot => { opts[slot] = [a[slot]]; });
-        return opts;
+        return {
+            seed: 'preview',
+            skinColor: [a.skinColor], hair: [a.hair], hairColor: [a.hairColor], hairProbability: 100,
+            eyes: [a.eyes], eyebrows: [a.eyebrows], mouth: [a.mouth],
+            glassesProbability: 0, earringsProbability: 0, featuresProbability: 0
+        };
     }
 
     // character.equipped는 전부 상점 아이템 id를 저장하므로, 실제 렌더링에 쓰일 Dicebear variant 값은
@@ -863,22 +872,31 @@
         overrides = overrides || {};
         const eq = Object.assign({}, character.equipped, overrides.equipped);
         function itemFor(slot) { return eq[slot] ? SHOP_ITEMS.find(i => i.id === eq[slot]) : null; }
-        const opts = { seed: character.id || 'preview' };
-        REQUIRED_SLOTS.forEach(slot => {
-            const item = itemFor(slot);
-            opts[slot] = [item ? item.variant : AVATAR_POOLS[slot][0]];
-        });
-        OPTIONAL_SLOTS.forEach(slot => {
-            const item = itemFor(slot);
-            opts[slot + 'Probability'] = item ? 100 : 0;
-            if (item) opts[slot] = [item.variant];
-        });
+        const hair = itemFor('hair'), hairColor = itemFor('hairColor'), skinColor = itemFor('skinColor');
+        const eyes = itemFor('eyes'), eyebrows = itemFor('eyebrows'), mouth = itemFor('mouth');
+        const glassesItem = itemFor('glasses'), earringsItem = itemFor('earrings'), featureItem = itemFor('feature');
+        const opts = {
+            seed: character.id || 'preview',
+            skinColor: [skinColor ? skinColor.variant : AVATAR_SKIN_COLORS[0]],
+            hair: [hair ? hair.variant : AVATAR_HAIR[0]],
+            hairColor: [hairColor ? hairColor.variant : AVATAR_HAIR_COLORS[0]],
+            hairProbability: 100,
+            eyes: [eyes ? eyes.variant : AVATAR_EYES[0]],
+            eyebrows: [eyebrows ? eyebrows.variant : AVATAR_EYEBROWS[0]],
+            mouth: [mouth ? mouth.variant : AVATAR_MOUTH[0]],
+            glassesProbability: glassesItem ? 100 : 0,
+            earringsProbability: earringsItem ? 100 : 0,
+            featuresProbability: featureItem ? 100 : 0
+        };
+        if (glassesItem) opts.glasses = [glassesItem.variant];
+        if (earringsItem) opts.earrings = [earringsItem.variant];
+        if (featureItem) opts.features = [featureItem.variant];
         return opts;
     }
 
     function avatarHtml(character, size) {
         size = size || 48;
-        const svg = renderCharacterSvg(buildAvatarOptions(character), size);
+        const svg = renderAdventurerSvg(buildAvatarOptions(character), size);
         return `<div class="avatar-display" style="width:${size}px;height:${size}px;">${svg}</div>`;
     }
 
@@ -949,7 +967,7 @@
     }
 
     function renderCcAvatarBuilder() {
-        document.getElementById('cc-avatar-preview').innerHTML = renderCharacterSvg(ccFullOptions(), 96);
+        document.getElementById('cc-avatar-preview').innerHTML = renderAdventurerSvg(ccFullOptions(), 96);
         const wrap = document.getElementById('cc-option-sections');
         wrap.innerHTML = '';
         CC_OPTION_DEFS.forEach(def => {
@@ -967,7 +985,7 @@
                     btn.style.background = '#' + value;
                 } else {
                     btn.className = 'cc-thumb-btn' + (selected ? ' selected' : '');
-                    btn.innerHTML = renderCharacterSvg(ccOptionsWith(def.key, value), 44);
+                    btn.innerHTML = renderAdventurerSvg(ccOptionsWith(def.key, value), 44);
                 }
                 btn.onclick = () => {
                     ccAvatarOptions[def.key] = value;
@@ -994,13 +1012,12 @@
         if (!ccGender) { alert('성별을 선택해주세요!'); return; }
 
         const equipped = equippedItemIdsFor(ccAvatarOptions);
-        const startingOwned = REQUIRED_SLOTS.map(slot => equipped[slot]);
+        const startingOwned = [equipped.hair, equipped.hairColor, equipped.skinColor, equipped.eyes, equipped.eyebrows, equipped.mouth];
         const character = {
             id: 'char_' + Date.now(),
             name: name,
             age: ageVal ? Number(ageVal) : null,
             gender: ccGender,
-            avatarFormat: AVATAR_FORMAT_VERSION,
             equipped: equipped,
             owned: startingOwned,
             freeItemIds: startingOwned.slice(),
@@ -1062,7 +1079,7 @@
                 }
                 const previewOptions = buildAvatarOptions(character, { equipped: Object.assign({}, character.equipped, { [slot]: item.id }) });
                 card.innerHTML = `
-                    <div class="shop-item-avatar">${renderCharacterSvg(previewOptions, 56)}</div>
+                    <div class="shop-item-avatar">${renderAdventurerSvg(previewOptions, 56)}</div>
                     <div class="shop-item-name">${item.name}</div>
                     <button class="shop-item-btn${equipped ? ' equipped' : ''}" ${btnDisabled ? 'disabled' : ''}>${btnLabel}</button>
                 `;
