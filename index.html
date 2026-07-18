@@ -2615,7 +2615,7 @@
                 else if (nc === color && !visited.has(nk)) { visited.add(nk); stack.push([nx, ny]); }
             });
         }
-        return { stones, liberties: libs.size };
+        return { stones, liberties: libs.size, libertyPoints: [...libs].map(k => k.split('_').map(Number)) };
     }
 
     function boardsEqual(a, b) {
@@ -2961,10 +2961,61 @@
         return n;
     }
 
+    // 사다리(축) 읽기: 활로 2개로 몰린 무리를 계속 몰아붙였을 때(단수 -> 도망 -> 단수 -> ...)
+    // 결국 잡히는지 시뮬레이션한다. true면 chaserColor가 사다리로 반드시 잡을 수 있다는 뜻이라,
+    // "일단 몰고 보는" 헛수와 "실제로 잡히는" 압박을 구분할 수 있다.
+    function readLadder(board, startX, startY, chaserColor) {
+        let simBoard = clonePlayBoard(board);
+        const fleeColor = simBoard[startY][startX];
+        let ax = startX, ay = startY;
+        for (let step = 0; step < 20; step++) {
+            const g = getGroupAndLiberties(simBoard, ax, ay);
+            if (!g || g.liberties === 0) return true;
+            if (g.liberties >= 3) return false; // 활로가 늘어나며 벗어남
+            if (g.liberties === 1) return true; // 마지막 활로만 메우면 바로 잡힘
+
+            let advanced = false;
+            for (const [lx, ly] of g.libertyPoints) {
+                const afterChase = tryPlayMove(simBoard, lx, ly, chaserColor);
+                if (!afterChase.ok) continue;
+                const chased = getGroupAndLiberties(afterChase.board, ax, ay);
+                if (!chased || chased.liberties === 0) return true;
+                if (chased.liberties !== 1) continue; // 이 방향으로 몰아도 단수가 안 됨 - 다른 활로 시도
+                const [ex, ey] = chased.libertyPoints[0];
+                const afterFlee = tryPlayMove(afterChase.board, ex, ey, fleeColor);
+                if (!afterFlee.ok) return true; // 도망갈 수조차 없음 - 잡힘
+                simBoard = afterFlee.board;
+                ax = ex; ay = ey;
+                advanced = true;
+                break;
+            }
+            if (!advanced) return false; // 몰아붙일 방법이 없음 - 사다리 실패로 안전하게 처리
+        }
+        return false; // 스텝 초과 - 사다리 안 통하는 것으로 처리
+    }
+
+    // color의 돌 중 지금 단수(활로 1개)인 무리들의 "살릴 수 있는 지점"을 모아둔다.
+    // 후보 수마다 매번 판 전체를 다시 훑지 않도록 aiChooseMove에서 한 번만 계산해서 넘겨준다.
+    function findAtariLibertyPoints(board, color) {
+        const seen = new Set();
+        const points = [];
+        for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
+            if (board[y][x] !== color) continue;
+            const k = x + '_' + y;
+            if (seen.has(k)) continue;
+            const g = getGroupAndLiberties(board, x, y);
+            g.stones.forEach(([sx, sy]) => seen.add(sx + '_' + sy));
+            if (g.liberties === 1) points.push(g.libertyPoints[0]);
+        }
+        return points;
+    }
+
     // 후보 수 하나를 평가해서 점수를 매긴다. 점수가 높을수록 AI가 선호하는 수.
     // 잡기/단수 회피 같은 전술 점수에 더해 집(computePlayScore) 차이와 모양(내 돌 근처인지),
-    // 초반 화점 선호까지 반영해서 "잡을 게 없는 국면"에서도 방향성 있게 두도록 한다.
-    function evaluateAiMove(board, x, y, color, difficulty) {
+    // 초반 화점 선호, 사다리가 실제로 통하는지, 단수된 내 돌을 살리는지까지 반영해서
+    // "잡을 게 없는 국면"에서도 방향성 있게 두고 돌을 지키고 압박하는 판단을 하도록 한다.
+    // myAtariLibertyPoints: 초보 이상 난이도에서만 쓰는, 지금 단수인 내 무리들의 구원 지점 목록.
+    function evaluateAiMove(board, x, y, color, difficulty, myAtariLibertyPoints) {
         const opponent = color === 'black' ? 'white' : 'black';
         const result = tryPlayMove(board, x, y, color);
         let score = randInt(0, 2);
@@ -2974,16 +3025,29 @@
         score += Math.min(myGroup.liberties, 4);
         if (myGroup.liberties === 1) score -= 10; // 스스로 단수에 놓이는 수는 피한다
 
-        // 이 수로 상대 무리를 단수로 몰았다면 가산점
+        // 이 수로 상대 무리를 단수로 몰았다면 가산점. 활로 2개로 몰아넣은 경우(사다리 모양)엔
+        // 실제로 사다리가 통하는지 확인해서, 안 통하는 헛된 추격에는 점수를 주지 않는다.
         const processedOpp = new Set();
         playNeighbors(x, y).forEach(([nx, ny]) => {
             const nk = nx + '_' + ny;
             if (result.board[ny][nx] === opponent && !processedOpp.has(nk)) {
                 const g = getGroupAndLiberties(result.board, nx, ny);
                 g.stones.forEach(([sx, sy]) => processedOpp.add(sx + '_' + sy));
-                if (g.liberties === 1) score += 6;
+                if (g.liberties === 1) {
+                    score += 6;
+                } else if (g.liberties === 2 && difficulty !== 'beginner') {
+                    if (readLadder(result.board, nx, ny, color)) score += 8; // 사다리로 확실히 잡힘
+                    else score -= 2; // 도망가는 사다리 - 괜히 몰아붙이지 않는다
+                }
             }
         });
+
+        // 원래 단수였던 내 무리를 이 수로 살렸다면 큰 가산점 - "돌을 지키는" 가장 기본적인 판단.
+        // 살린 뒤에도 사다리로 다시 쫓기면(활로 2개뿐이고 사다리가 통하면) 가산점을 줄인다.
+        if (difficulty !== 'beginner' && myAtariLibertyPoints && myAtariLibertyPoints.some(([lx, ly]) => lx === x && ly === y) && myGroup.liberties >= 2) {
+            const stillChased = myGroup.liberties === 2 && readLadder(result.board, x, y, opponent);
+            score += stillChased ? 4 : 15;
+        }
 
         // 집 차이(내 집 - 상대 집). 초반엔 아직 집이 갈리지 않아 영향이 작고,
         // 판이 채워질수록 점점 중요해져서 자연스럽게 "영역을 넓히는" 수를 선호하게 된다.
@@ -3038,11 +3102,19 @@
                 return g.liberties > 1 || r.captured.length > 0;
             });
             const pool = capturing.length > 0 ? capturing : (safe.length > 0 ? safe : moves);
-            return pool[randInt(0, pool.length - 1)];
+            // 무작위로 고르지 않고 그 안에서 그나마 나은 수를 고른다(사다리/단수 구원 판단은 없음 - 그래도
+            // 왕초보보다는 낫고 중수보다는 뚜렷하게 약하도록 남겨둔다).
+            const scoredPool = pool.map(m => ({ m: m, s: evaluateAiMove(board, m.x, m.y, color, difficulty) }));
+            scoredPool.sort((a, b) => b.s - a.s);
+            const bestPoolScore = scoredPool[0].s;
+            const bestPool = scoredPool.filter(c => c.s === bestPoolScore).map(c => c.m);
+            return bestPool[randInt(0, bestPool.length - 1)];
         }
 
-        // 중수 / 고수 공통: 모든 후보 수를 평가해서 점수순으로 정렬한다.
-        const scored = shuffle(moves).map(m => ({ m: m, s: evaluateAiMove(board, m.x, m.y, color, difficulty) }));
+        // 중수 / 고수 공통: 이미 단수인 내 무리를 먼저 한 번만 계산해두고(후보마다 반복하면 비싸다),
+        // 모든 후보 수를 평가해서 점수순으로 정렬한다.
+        const myAtariLibertyPoints = findAtariLibertyPoints(board, color);
+        const scored = shuffle(moves).map(m => ({ m: m, s: evaluateAiMove(board, m.x, m.y, color, difficulty, myAtariLibertyPoints) }));
         scored.sort((a, b) => b.s - a.s);
 
         if (difficulty === 'mid') {
