@@ -313,8 +313,26 @@
             font-size: 15px; font-weight: bold; color: #2c5e43; margin-bottom: 10px; text-align: center;
         }
         .play-message { font-size: 14px; font-weight: bold; color: #d32f2f; min-height: 20px; margin-bottom: 6px; text-align: center; }
-        .btn-undo, .btn-pass, .btn-takeback { background-color: #78909c; }
-        .btn-end { background-color: #e53935; }
+
+        /* 대국 조작 버튼: 1행 4열, 아이콘+글자 카드형 */
+        .play-controls-row {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+            width: 100%; margin: 8px 0 4px; box-sizing: border-box;
+        }
+        .play-action-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 6px; padding: 12px 2px; border: none; border-radius: 12px;
+            background: #e4e4e4; box-shadow: 0 2px 3px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.7);
+            cursor: pointer; transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .play-action-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 1px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+        }
+        .play-action-icon { font-size: 26px; line-height: 1; }
+        .play-action-label { font-size: 12px; font-weight: bold; color: #333; white-space: nowrap; }
+        .play-action-end { background: #e53935; box-shadow: 0 2px 3px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.25); }
+        .play-action-end .play-action-label { color: #fff; }
         .play-mark-x {
             width: 24px; height: 24px; position: relative; pointer-events: none;
         }
@@ -517,13 +535,23 @@
         <div class="play-turn-indicator" id="play-turn-indicator"></div>
         <div class="play-message" id="play-message"></div>
 
-        <div class="controls">
-            <button class="btn btn-undo" onclick="playUndo()">↩ 다시두기</button>
-            <button class="btn btn-pass" onclick="playPass()">⏭ 차례 넘기기</button>
-        </div>
-        <div class="controls">
-            <button class="btn btn-takeback" onclick="playTakeback()">🔙 무름</button>
-            <button class="btn btn-end" onclick="playEndGame()">🏁 대국 종료</button>
+        <div class="play-controls-row">
+            <button class="play-action-btn" onclick="playUndo()">
+                <span class="play-action-icon">🔄</span>
+                <span class="play-action-label">다시두기</span>
+            </button>
+            <button class="play-action-btn" onclick="playPass()">
+                <span class="play-action-icon">⏩</span>
+                <span class="play-action-label">패스</span>
+            </button>
+            <button class="play-action-btn" onclick="playTakeback()">
+                <span class="play-action-icon">⏪</span>
+                <span class="play-action-label">무르기</span>
+            </button>
+            <button class="play-action-btn play-action-end" onclick="playEndGame()">
+                <span class="play-action-icon">🏁</span>
+                <span class="play-action-label">종료</span>
+            </button>
         </div>
 
         <div class="play-opponent-bar" id="play-opponent-bar"></div>
