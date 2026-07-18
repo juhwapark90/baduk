@@ -237,10 +237,16 @@
         .intersection:hover { background-color: rgba(255, 255, 255, 0.4); }
 
         /* 바둑돌: 교차점(.intersection) 크기에 대한 비율로 그려서 판이 커지고 작아져도 같이 스케일된다 */
-        .stone { width: 80%; height: 80%; border-radius: 50%; box-shadow: 2px 2px 4px rgba(0,0,0,0.4); pointer-events: none; }
+        .stone { position: relative; width: 80%; height: 80%; border-radius: 50%; box-shadow: 2px 2px 4px rgba(0,0,0,0.4); pointer-events: none; }
         .stone.black { background: radial-gradient(circle at 30% 30%, #555, #111); }
         .stone.white { background: radial-gradient(circle at 30% 30%, #fff, #d4d4d4); border: 1px solid #ccc; box-sizing: border-box; }
         .stone.preview { box-shadow: 0 0 0 3px #ffeb3b, 2px 2px 4px rgba(0,0,0,0.4); }
+        /* 자유 대국에서 방금 둔 돌을 표시하는 점 - 흑/백 어느 쪽 돌 위에서도 잘 보이도록 흰 테두리를 두른다 */
+        .stone.last-move::after {
+            content: ''; position: absolute; top: 50%; left: 50%; width: 32%; height: 32%;
+            transform: translate(-50%, -50%); border-radius: 50%;
+            background: #ff5252; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.9);
+        }
 
         /* 개념 배우기(슬라이드) 미니 바둑판 - 메인 바둑판과 같은 방식(% 기반)으로 반응형 처리 */
         .learn-board {
@@ -2575,6 +2581,7 @@
     let playTurn = 'black';
     let playHistory = [];          // 각 수를 두기 "직전" 상태의 스냅샷 목록 (다시두기/무름/차례넘기기 취소용)
     let playCapturedBy = { black: 0, white: 0 }; // 각 색이 "잡아낸" 상대 돌 개수
+    let playLastMove = null;       // 방금 둔 수 {x,y} - 판에서 시각적으로 표시해준다
     let playMode = null;            // 'offline' | 'ai'
     let playOpponentName = '';
     let playAiDifficulty = null;
@@ -2611,9 +2618,16 @@
         return { stones, liberties: libs.size };
     }
 
+    function boardsEqual(a, b) {
+        for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) if (a[y][x] !== b[y][x]) return false;
+        return true;
+    }
+
     // board에 (x,y)에 color 돌을 두려고 시도한다. 이미 돌이 있거나 자충수(자살수)면 실패.
+    // koBoard가 주어지면(직전 상대 수를 두기 "전" 판 상태), 이 수를 둔 결과가 koBoard와 똑같아지는
+    // 경우도 실패 처리한다 - 패(劫): 단수를 주고받으며 같은 자리를 계속 따내는 것을 막는 규칙.
     // 성공하면 상대 돌 중 활로가 0이 된 무리를 모두 따내고 새 board와 잡은 돌 목록을 돌려준다.
-    function tryPlayMove(board, x, y, color) {
+    function tryPlayMove(board, x, y, color, koBoard) {
         if (board[y][x] !== 0) return { ok: false, reason: 'occupied' };
         const newBoard = clonePlayBoard(board);
         newBoard[y][x] = color;
@@ -2633,15 +2647,16 @@
         });
         const myGroup = getGroupAndLiberties(newBoard, x, y);
         if (captured.length === 0 && myGroup.liberties === 0) return { ok: false, reason: 'suicide' };
+        if (koBoard && boardsEqual(newBoard, koBoard)) return { ok: false, reason: 'ko' };
         return { ok: true, board: newBoard, captured };
     }
 
-    function listLegalMoves(board, color) {
+    function listLegalMoves(board, color, koBoard) {
         const moves = [];
         for (let y = 0; y < 9; y++) {
             for (let x = 0; x < 9; x++) {
                 if (board[y][x] !== 0) continue;
-                if (tryPlayMove(board, x, y, color).ok) moves.push({ x, y });
+                if (tryPlayMove(board, x, y, color, koBoard).ok) moves.push({ x, y });
             }
         }
         return moves;
@@ -2729,6 +2744,7 @@
         playHistory = [];
         playCapturedBy = { black: 0, white: 0 };
         playGameEnded = false;
+        playLastMove = null;
         document.getElementById('play-message').innerText = '';
     }
 
@@ -2814,7 +2830,8 @@
             for (let x = 0; x < 9; x++) {
                 const cell = document.getElementById(`play-pos-${x}-${y}`);
                 const v = playBoard[y][x];
-                cell.innerHTML = v ? `<div class="stone ${v}"></div>` : '';
+                const isLast = playLastMove && playLastMove.x === x && playLastMove.y === y;
+                cell.innerHTML = v ? `<div class="stone ${v}${isLast ? ' last-move' : ''}"></div>` : '';
             }
         }
     }
@@ -2839,16 +2856,21 @@
     }
 
     function attemptPlayMove(x, y) {
-        const result = tryPlayMove(playBoard, x, y, playTurn);
+        // 패(劫) 규칙: 직전 상대 수를 두기 "전" 판 상태를 다시 만드는 수는 둘 수 없다.
+        const koBoard = playHistory.length > 0 ? playHistory[playHistory.length - 1].board : null;
+        const result = tryPlayMove(playBoard, x, y, playTurn, koBoard);
         document.getElementById('play-message').innerText = '';
         if (!result.ok) {
             document.getElementById('play-message').innerText =
-                result.reason === 'occupied' ? '이미 돌이 있어요!' : '그 자리에는 둘 수 없어요 (자충수)!';
+                result.reason === 'occupied' ? '이미 돌이 있어요!'
+                : result.reason === 'ko' ? '패! 상대 돌을 바로 다시 따낼 수 없어요. 다른 곳에 먼저 둬보세요.'
+                : '그 자리에는 둘 수 없어요 (자충수)!';
             return;
         }
-        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy } });
+        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy }, lastMove: playLastMove });
         playBoard = result.board;
         if (result.captured.length > 0) playCapturedBy[playTurn] += result.captured.length;
+        playLastMove = { x, y };
         playStoneSound();
         playTurn = playTurn === 'black' ? 'white' : 'black';
         renderPlayBoardStones();
@@ -2865,7 +2887,7 @@
         if (playGameEnded) return;
         if (playHistory.length === 0) { document.getElementById('play-message').innerText = '되돌릴 수 있는 수가 없어요!'; return; }
         const prev = playHistory.pop();
-        playBoard = prev.board; playTurn = prev.turn; playCapturedBy = prev.capturedBy;
+        playBoard = prev.board; playTurn = prev.turn; playCapturedBy = prev.capturedBy; playLastMove = prev.lastMove || null;
         document.getElementById('play-message').innerText = '';
         renderPlayBoardStones();
         renderPlayTurnIndicator();
@@ -2878,7 +2900,7 @@
         if (playHistory.length === 0) { document.getElementById('play-message').innerText = '무를 수 있는 수가 없어요!'; return; }
         const first = playHistory.pop();
         const second = playHistory.length > 0 ? playHistory.pop() : first;
-        playBoard = second.board; playTurn = second.turn; playCapturedBy = second.capturedBy;
+        playBoard = second.board; playTurn = second.turn; playCapturedBy = second.capturedBy; playLastMove = second.lastMove || null;
         document.getElementById('play-message').innerText = '';
         renderPlayBoardStones();
         renderPlayTurnIndicator();
@@ -2887,7 +2909,7 @@
 
     function playPass() {
         if (playGameEnded) return;
-        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy } });
+        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy }, lastMove: playLastMove });
         playTurn = playTurn === 'black' ? 'white' : 'black';
         document.getElementById('play-message').innerText = '';
         renderPlayTurnIndicator();
@@ -3001,8 +3023,8 @@
         return score;
     }
 
-    function aiChooseMove(board, color, difficulty) {
-        const moves = listLegalMoves(board, color);
+    function aiChooseMove(board, color, difficulty, koBoard) {
+        const moves = listLegalMoves(board, color, koBoard);
         if (moves.length === 0) return null;
 
         if (difficulty === 'beginner0') {
@@ -3049,7 +3071,8 @@
 
     function aiTakeTurn() {
         if (playGameEnded || playMode !== 'ai' || playTurn !== 'white') return;
-        const move = aiChooseMove(playBoard, 'white', playAiDifficulty);
+        const koBoard = playHistory.length > 0 ? playHistory[playHistory.length - 1].board : null;
+        const move = aiChooseMove(playBoard, 'white', playAiDifficulty, koBoard);
         if (!move) { playPass(); return; }
         attemptPlayMove(move.x, move.y);
     }
