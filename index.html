@@ -100,11 +100,16 @@
 
         /* 아바타 (이모지 + 액세서리 겹치기) */
         .avatar-display { position: relative; display: inline-block; line-height: 1; }
-        .avatar-display .acc-hat { position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%) scale(0.55); }
-        .avatar-display .acc-glasses { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%) scale(0.5); }
-        .avatar-display .acc-extra { position: absolute; bottom: -0.15em; right: -0.15em; transform: scale(0.5); }
+        .avatar-display .avatar-base { position: relative; z-index: 2; }
+        .avatar-display .acc-hat { position: absolute; top: -0.5em; left: 50%; transform: translateX(-50%) scale(0.55); z-index: 3; }
+        .avatar-display .acc-glasses { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%) scale(0.5); z-index: 3; }
+        .avatar-display .acc-extra { position: absolute; bottom: -0.15em; right: -0.15em; transform: scale(0.5); z-index: 3; }
         .avatar-display .acc-extra_ribbon { top: 3%; left: 50%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.5); }
         .avatar-display .acc-extra_scarf { top: 86%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.55); }
+        .avatar-display .acc-extra_flower { top: 6%; left: 22%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.4); }
+        .avatar-display .acc-extra_butterfly { top: 8%; left: 78%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.38); }
+        .avatar-display .acc-extra_necklace { top: 82%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.42); }
+        .avatar-display .acc-top { position: absolute; bottom: -0.08em; left: 50%; transform: translateX(-50%) scale(0.95); z-index: 1; }
 
         /* 캐릭터 선택 화면 */
         .character-select-list { display: flex; gap: 12px; width: 100%; margin: 14px 0; flex-wrap: wrap; justify-content: center; }
@@ -597,7 +602,7 @@
         }
         const character = {
             id: 'char_legacy', name: '바둑이', age: null, gender: 'none', avatar: '🧑',
-            equipped: { hat: null, glasses: null, extra: null }, owned: [], topics: legacyTopics
+            equipped: { hat: null, glasses: null, top: null, extra: null }, owned: [], topics: legacyTopics
         };
         return { characters: [character], activeCharacterId: character.id };
     }
@@ -687,22 +692,35 @@
     const SHOP_ITEMS = [
         { id: 'hat_top', slot: 'hat', emoji: '🎩', name: '멋진 모자', price: 50 },
         { id: 'hat_crown', slot: 'hat', emoji: '👑', name: '반짝이는 왕관', price: 150 },
+        { id: 'hat_cap', slot: 'hat', emoji: '🧢', name: '야구 모자', price: 40 },
+        { id: 'hat_sun', slot: 'hat', emoji: '👒', name: '햇살 모자', price: 45 },
+        { id: 'hat_grad', slot: 'hat', emoji: '🎓', name: '박사모', price: 60 },
         { id: 'glasses_sun', slot: 'glasses', emoji: '🕶️', name: '선글라스', price: 40 },
         { id: 'glasses_round', slot: 'glasses', emoji: '👓', name: '동그란 안경', price: 30 },
+        { id: 'glasses_goggle', slot: 'glasses', emoji: '🥽', name: '물안경', price: 35 },
+        { id: 'top_tshirt', slot: 'top', emoji: '👕', name: '티셔츠', price: 45 },
+        { id: 'top_dress', slot: 'top', emoji: '👗', name: '예쁜 원피스', price: 55 },
+        { id: 'top_hanbok', slot: 'top', emoji: '👘', name: '알록달록 한복', price: 65 },
+        { id: 'top_vest', slot: 'top', emoji: '🦺', name: '멋쟁이 조끼', price: 40 },
         { id: 'extra_scarf', slot: 'extra', emoji: '🧣', name: '따뜻한 목도리', price: 60 },
         { id: 'extra_ribbon', slot: 'extra', emoji: '🎀', name: '예쁜 리본', price: 35 },
+        { id: 'extra_flower', slot: 'extra', emoji: '🌸', name: '벚꽃 머리핀', price: 30 },
+        { id: 'extra_butterfly', slot: 'extra', emoji: '🦋', name: '나비 장식', price: 30 },
+        { id: 'extra_necklace', slot: 'extra', emoji: '📿', name: '반짝 목걸이', price: 45 },
         { id: 'extra_star', slot: 'extra', emoji: '⭐', name: '반짝 스티커', price: 20 }
     ];
-    const SLOT_LABELS = { hat: '모자', glasses: '안경', extra: '기타 장식' };
+    const SLOT_LABELS = { hat: '모자', glasses: '안경', top: '상의', extra: '기타 장식' };
 
     function avatarHtml(character, size) {
         size = size || 48;
         const eq = character.equipped || {};
         const hat = eq.hat ? SHOP_ITEMS.find(i => i.id === eq.hat) : null;
         const glasses = eq.glasses ? SHOP_ITEMS.find(i => i.id === eq.glasses) : null;
+        const top = eq.top ? SHOP_ITEMS.find(i => i.id === eq.top) : null;
         const extra = eq.extra ? SHOP_ITEMS.find(i => i.id === eq.extra) : null;
         return `
             <div class="avatar-display" style="font-size:${size}px;">
+                ${top ? `<span class="acc-top">${top.emoji}</span>` : ''}
                 <span class="avatar-base">${character.avatar}</span>
                 ${hat ? `<span class="acc-hat">${hat.emoji}</span>` : ''}
                 ${glasses ? `<span class="acc-glasses">${glasses.emoji}</span>` : ''}
@@ -803,7 +821,7 @@
             age: ageVal ? Number(ageVal) : null,
             gender: selectedGender,
             avatar: selectedAvatar,
-            equipped: { hat: null, glasses: null, extra: null },
+            equipped: { hat: null, glasses: null, top: null, extra: null },
             owned: [],
             topics: {}
         };
@@ -830,7 +848,7 @@
 
         const list = document.getElementById('shop-item-list');
         list.innerHTML = '';
-        ['hat', 'glasses', 'extra'].forEach(slot => {
+        ['hat', 'glasses', 'top', 'extra'].forEach(slot => {
             const section = document.createElement('div');
             section.className = 'shop-slot-section';
             section.innerHTML = `<h3 class="shop-slot-title">${SLOT_LABELS[slot]}</h3>`;
