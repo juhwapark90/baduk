@@ -164,8 +164,13 @@
         .cc-color-btn.selected { border-color: #2196F3; box-shadow: 0 0 0 2px #e3f2fd; }
 
         /* 상점 화면 */
+        /* 아래로 스크롤해도 지금 모습/남은 포인트가 계속 보이도록 상단에 고정 */
+        .shop-sticky-header {
+            position: sticky; top: 0; z-index: 5; background: #fff;
+            margin: 0 -25px; padding: 10px 25px 10px; border-bottom: 1px solid #eee;
+        }
         .shop-preview { display: flex; justify-content: center; margin: 10px 0; }
-        .shop-wallet-row { font-size: 16px; font-weight: bold; color: #ff9800; margin-bottom: 14px; }
+        .shop-wallet-row { font-size: 16px; font-weight: bold; color: #ff9800; margin-bottom: 10px; }
         .shop-slot-section { margin-bottom: 16px; text-align: left; }
         .shop-slot-title { font-size: 14px; color: #2c5e43; margin: 0 0 8px; }
         .shop-item-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -375,8 +380,10 @@
 <div id="screen-shop" class="screen">
     <div class="container">
         <h2>🛍️ 캐릭터 상점</h2>
-        <div id="shop-preview" class="shop-preview"></div>
-        <div class="shop-wallet-row">💰 <span id="shop-wallet">0P</span></div>
+        <div class="shop-sticky-header">
+            <div id="shop-preview" class="shop-preview"></div>
+            <div class="shop-wallet-row">💰 <span id="shop-wallet">0P</span></div>
+        </div>
         <div id="shop-item-list"></div>
         <button class="btn btn-back" onclick="switchScreen('screen-home')">◀ 홈으로</button>
     </div>
