@@ -735,7 +735,19 @@
         { key: 'mouth', label: '입', pool: AVATAR_MOUTH, kind: 'thumb' }
     ];
 
+    // 얼굴 각 부위(헤어/눈/눈썹/입/머리색/피부색)도 액세서리와 동일하게 "상점 아이템"으로 다룬다.
+    // 캐릭터 생성 때 고른 값만 처음부터 무료로 소유하고, 나머지는 상점에서 포인트로 사서 바꿔 낄 수 있다.
+    function buildVariantShopItems(slot, pool, label, price) {
+        return pool.map((variant, i) => ({ id: slot + '_' + variant, slot: slot, variant: variant, name: label + ' ' + (i + 1), price: price }));
+    }
+
     const SHOP_ITEMS = [
+        ...buildVariantShopItems('hair', AVATAR_HAIR, '헤어스타일', 15),
+        ...buildVariantShopItems('hairColor', AVATAR_HAIR_COLORS, '머리색', 10),
+        ...buildVariantShopItems('skinColor', AVATAR_SKIN_COLORS, '피부색', 10),
+        ...buildVariantShopItems('eyes', AVATAR_EYES, '눈 스타일', 12),
+        ...buildVariantShopItems('eyebrows', AVATAR_EYEBROWS, '눈썹 스타일', 10),
+        ...buildVariantShopItems('mouth', AVATAR_MOUTH, '입 스타일', 12),
         { id: 'glasses_1', slot: 'glasses', variant: 'variant01', name: '안경 스타일 1', price: 30 },
         { id: 'glasses_2', slot: 'glasses', variant: 'variant02', name: '안경 스타일 2', price: 30 },
         { id: 'glasses_3', slot: 'glasses', variant: 'variant03', name: '안경 스타일 3', price: 40 },
@@ -752,7 +764,14 @@
         { id: 'feature_birthmark', slot: 'feature', variant: 'birthmark', name: '뷰티마크', price: 20 },
         { id: 'feature_mustache', slot: 'feature', variant: 'mustache', name: '콧수염', price: 25 }
     ];
-    const SLOT_LABELS = { glasses: '안경', earrings: '귀걸이', feature: '표정 꾸미기' };
+    const SLOT_LABELS = {
+        hair: '헤어스타일', hairColor: '머리색', skinColor: '피부색',
+        eyes: '눈', eyebrows: '눈썹', mouth: '입',
+        glasses: '안경', earrings: '귀걸이', feature: '표정 꾸미기'
+    };
+    // 항상 값이 있어야 하는 슬롯(얼굴 자체) - 액세서리와 달리 "해제"가 없다.
+    const REQUIRED_SLOTS = ['hair', 'hairColor', 'skinColor', 'eyes', 'eyebrows', 'mouth'];
+    const OPTIONAL_SLOTS = ['glasses', 'earrings', 'feature'];
 
     function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -787,16 +806,30 @@
         };
     }
 
-    // 예전 형식(이모지 avatar + hat/glasses/extra 슬롯)으로 저장된 캐릭터를
-    // Dicebear 옵션 기반 형식으로 제자리 변환한다. 이미 새 형식이면 손대지 않는다.
+    function equippedItemIdsFor(base) {
+        return {
+            hair: 'hair_' + base.hair,
+            hairColor: 'hairColor_' + base.hairColor,
+            skinColor: 'skinColor_' + base.skinColor,
+            eyes: 'eyes_' + base.eyes,
+            eyebrows: 'eyebrows_' + base.eyebrows,
+            mouth: 'mouth_' + base.mouth,
+            glasses: null, earrings: null, feature: null
+        };
+    }
+
+    // 예전 형식(이모지 조합, avataaars 파츠 조합, 혹은 얼굴이 상점 아이템화되기 전의 Dicebear 형식)으로
+    // 저장된 캐릭터를 지금 형식(얼굴 부위 전부가 상점 아이템 id로 equipped/owned에 들어가는 형식)으로 옮긴다.
+    // 이미 새 형식이면 손대지 않는다.
     function ensureAvatarOptions(character) {
-        if (!character.avatarOptions || typeof character.avatar === 'string') {
-            character.avatarOptions = defaultAvatarOptionsFor(character.id || character.name || 'raon');
+        const alreadyNewFormat = character.equipped && character.equipped.hair && !character.avatarOptions && typeof character.avatar !== 'string';
+        if (!alreadyNewFormat) {
+            const base = character.avatarOptions || defaultAvatarOptionsFor(character.id || character.name || 'raon');
+            character.equipped = equippedItemIdsFor(base);
+            character.owned = [character.equipped.hair, character.equipped.hairColor, character.equipped.skinColor,
+                character.equipped.eyes, character.equipped.eyebrows, character.equipped.mouth];
             delete character.avatar;
-            character.equipped = { glasses: null, earrings: null, feature: null };
-            character.owned = [];
-        } else if (!character.equipped || ('hat' in character.equipped)) {
-            character.equipped = { glasses: null, earrings: null, feature: null };
+            delete character.avatarOptions;
         }
         if (!character.owned) character.owned = [];
         return character;
@@ -820,19 +853,24 @@
         };
     }
 
-    // character.equipped는 상점 아이템 id(예: 'glasses_1')를 저장하므로, 실제 렌더링에 쓰일
-    // Dicebear variant 값은 SHOP_ITEMS에서 찾아서 꺼낸다.
+    // character.equipped는 전부 상점 아이템 id를 저장하므로, 실제 렌더링에 쓰일 Dicebear variant 값은
+    // 매번 SHOP_ITEMS에서 찾아서 꺼낸다.
     function buildAvatarOptions(character, overrides) {
         overrides = overrides || {};
-        const a = Object.assign({}, character.avatarOptions);
         const eq = Object.assign({}, character.equipped, overrides.equipped);
-        const glassesItem = eq.glasses ? SHOP_ITEMS.find(i => i.id === eq.glasses) : null;
-        const earringsItem = eq.earrings ? SHOP_ITEMS.find(i => i.id === eq.earrings) : null;
-        const featureItem = eq.feature ? SHOP_ITEMS.find(i => i.id === eq.feature) : null;
+        function itemFor(slot) { return eq[slot] ? SHOP_ITEMS.find(i => i.id === eq[slot]) : null; }
+        const hair = itemFor('hair'), hairColor = itemFor('hairColor'), skinColor = itemFor('skinColor');
+        const eyes = itemFor('eyes'), eyebrows = itemFor('eyebrows'), mouth = itemFor('mouth');
+        const glassesItem = itemFor('glasses'), earringsItem = itemFor('earrings'), featureItem = itemFor('feature');
         const opts = {
             seed: character.id || 'preview',
-            skinColor: [a.skinColor], hair: [a.hair], hairColor: [a.hairColor], hairProbability: 100,
-            eyes: [a.eyes], eyebrows: [a.eyebrows], mouth: [a.mouth],
+            skinColor: [skinColor ? skinColor.variant : AVATAR_SKIN_COLORS[0]],
+            hair: [hair ? hair.variant : AVATAR_HAIR[0]],
+            hairColor: [hairColor ? hairColor.variant : AVATAR_HAIR_COLORS[0]],
+            hairProbability: 100,
+            eyes: [eyes ? eyes.variant : AVATAR_EYES[0]],
+            eyebrows: [eyebrows ? eyebrows.variant : AVATAR_EYEBROWS[0]],
+            mouth: [mouth ? mouth.variant : AVATAR_MOUTH[0]],
             glassesProbability: glassesItem ? 100 : 0,
             earringsProbability: earringsItem ? 100 : 0,
             featuresProbability: featureItem ? 100 : 0
@@ -960,14 +998,14 @@
         if (!name) { alert('이름을 입력해주세요!'); return; }
         if (!ccGender) { alert('성별을 선택해주세요!'); return; }
 
+        const equipped = equippedItemIdsFor(ccAvatarOptions);
         const character = {
             id: 'char_' + Date.now(),
             name: name,
             age: ageVal ? Number(ageVal) : null,
             gender: ccGender,
-            avatarOptions: Object.assign({}, ccAvatarOptions),
-            equipped: { glasses: null, earrings: null, feature: null },
-            owned: [],
+            equipped: equipped,
+            owned: [equipped.hair, equipped.hairColor, equipped.skinColor, equipped.eyes, equipped.eyebrows, equipped.mouth],
             topics: {}
         };
         profile.characters.push(character);
@@ -994,7 +1032,7 @@
 
         const list = document.getElementById('shop-item-list');
         list.innerHTML = '';
-        ['glasses', 'earrings', 'feature'].forEach(slot => {
+        [...REQUIRED_SLOTS, ...OPTIONAL_SLOTS].forEach(slot => {
             const section = document.createElement('div');
             section.className = 'shop-slot-section';
             section.innerHTML = `<h3 class="shop-slot-title">${SLOT_LABELS[slot]}</h3>`;
@@ -1007,8 +1045,13 @@
                 card.className = 'shop-item-card';
                 let btnLabel, btnDisabled = false, btnAction;
                 if (equipped) {
-                    btnLabel = '장착됨 (해제)';
-                    btnAction = () => unequipItem(slot);
+                    if (REQUIRED_SLOTS.includes(slot)) {
+                        btnLabel = '장착됨';
+                        btnDisabled = true;
+                    } else {
+                        btnLabel = '장착됨 (해제)';
+                        btnAction = () => unequipItem(slot);
+                    }
                 } else if (owned) {
                     btnLabel = '장착하기';
                     btnAction = () => equipItem(slot, item.id);
