@@ -104,7 +104,10 @@
            통일해 그려서 네트워크 상태와 무관하게 모든 기기에서 동일하게 보이게 한다.
            상의(옷)는 "얼굴 뒤에 숨기는" z-index 겹침 방식 대신, 얼굴과 아예 겹치지 않게
            얼굴 아래 별도 줄에 옷 그림의 어깨선 부분만 overflow:hidden으로 잘라 보여준다.
-           (겹침/쌓임 순서에 기대지 않는 방식이라 어떤 브라우저에서도 항상 같게 보인다) */
+           (겹침/쌓임 순서에 기대지 않는 방식이라 어떤 브라우저에서도 항상 같게 보인다)
+           상의를 사지 않은 기본 상태에도 목/어깨가 비어 보이지 않도록, avatar-body는
+           항상 렌더링하고 기본 배경(연한 옷깃 모양)을 깔아 둔 뒤 그 위에 구매한 옷
+           그림을 얹는다. */
         img.emoji { height: 1em; width: 1em; vertical-align: -0.1em; display: inline-block; }
         .avatar-display { position: relative; display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
         .avatar-head { position: relative; width: 1em; height: 1em; flex: none; }
@@ -115,12 +118,17 @@
         .avatar-head .acc-glasses_goggle { top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.62); }
         .avatar-head .acc-extra { bottom: 0; right: 0; left: auto; top: auto; transform: scale(0.4); z-index: 3; }
         .avatar-head .acc-extra_ribbon { top: -0.06em; left: 50%; right: auto; bottom: auto; transform: translateX(-50%) scale(0.42); }
-        .avatar-head .acc-extra_scarf { top: 85%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.5); }
-        .avatar-head .acc-extra_necklace { top: 85%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.36); }
+        .avatar-head .acc-extra_scarf { top: 96%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.52); }
+        .avatar-head .acc-extra_necklace { top: 96%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.38); }
         .avatar-head .acc-extra_flower { top: 4%; left: 20%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.34); }
         .avatar-head .acc-extra_butterfly { top: 14%; left: 84%; right: auto; bottom: auto; transform: translate(-50%, -50%) scale(0.32); }
-        .acc-top-wrap { width: 0.98em; height: 0.32em; overflow: hidden; margin-top: 0.03em; flex: none; }
-        .acc-top-wrap img.emoji { width: 0.98em; height: 0.98em; }
+        .avatar-body {
+            position: relative; width: 0.98em; height: 0.34em; overflow: hidden;
+            margin-top: 0; flex: none;
+            border-radius: 0 0 0.45em 0.45em;
+            background: linear-gradient(180deg, #d8dfe2, #b9c4c9);
+        }
+        .avatar-body img.emoji { width: 0.98em; height: 0.98em; display: block; }
 
         /* 캐릭터 선택 화면 */
         .character-select-list { display: flex; gap: 12px; width: 100%; margin: 14px 0; flex-wrap: wrap; justify-content: center; }
@@ -772,7 +780,7 @@
                     ${glasses ? `<span class="acc acc-glasses acc-${glasses.id}">${emojiImg(glasses.emoji)}</span>` : ''}
                     ${extra ? `<span class="acc acc-extra acc-${extra.id}">${emojiImg(extra.emoji)}</span>` : ''}
                 </div>
-                <div class="acc-top-wrap">${top ? emojiImg(top.emoji) : ''}</div>
+                <div class="avatar-body">${top ? emojiImg(top.emoji) : ''}</div>
             </div>`;
     }
 
