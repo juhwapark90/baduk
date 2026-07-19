@@ -2883,6 +2883,7 @@
     let playHistory = [];          // 각 수를 두기 "직전" 상태의 스냅샷 목록 (다시두기/무름/차례넘기기 취소용)
     let playCapturedBy = { black: 0, white: 0 }; // 각 색이 "잡아낸" 상대 돌 개수
     let playLastMove = null;       // 방금 둔 수 {x,y} - 판에서 시각적으로 표시해준다
+    let playConsecutivePasses = 0; // 연속 패스 횟수 - 2번 연속(양쪽 다 패스)이면 대국이 끝난다
     let playMode = null;            // 'offline' | 'ai'
     let playOpponentName = '';
     let playAiDifficulty = null;
@@ -3046,6 +3047,7 @@
         playCapturedBy = { black: 0, white: 0 };
         playGameEnded = false;
         playLastMove = null;
+        playConsecutivePasses = 0;
         document.getElementById('play-message').innerText = '';
     }
 
@@ -3174,10 +3176,11 @@
                 : '그 자리에는 둘 수 없어요 (자충수)!';
             return;
         }
-        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy }, lastMove: playLastMove });
+        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy }, lastMove: playLastMove, passes: playConsecutivePasses });
         playBoard = result.board;
         if (result.captured.length > 0) playCapturedBy[playTurn] += result.captured.length;
         playLastMove = { x, y };
+        playConsecutivePasses = 0; // 실제로 돌을 뒀으니 연속 패스 기록은 끊긴다
         playStoneSound();
         playTurn = playTurn === 'black' ? 'white' : 'black';
         renderPlayBoardStones();
@@ -3195,6 +3198,7 @@
         if (playHistory.length === 0) { document.getElementById('play-message').innerText = '되돌릴 수 있는 수가 없어요!'; return; }
         const prev = playHistory.pop();
         playBoard = prev.board; playTurn = prev.turn; playCapturedBy = prev.capturedBy; playLastMove = prev.lastMove || null;
+        playConsecutivePasses = prev.passes || 0;
         document.getElementById('play-message').innerText = '';
         renderPlayBoardStones();
         renderPlayTurnIndicator();
@@ -3208,18 +3212,27 @@
         const first = playHistory.pop();
         const second = playHistory.length > 0 ? playHistory.pop() : first;
         playBoard = second.board; playTurn = second.turn; playCapturedBy = second.capturedBy; playLastMove = second.lastMove || null;
+        playConsecutivePasses = second.passes || 0;
         document.getElementById('play-message').innerText = '';
         renderPlayBoardStones();
         renderPlayTurnIndicator();
         renderPlayBars();
     }
 
-    function playPass() {
+    // isAiPass: AI가 둘 만한 곳이 없어서 스스로 패스한 경우 - 사람 쪽에 왜 아무 일도
+    // 안 일어났는지 알려주는 안내 메시지를 보여준다. 실제 바둑 규칙대로 양쪽이 연속으로
+    // 패스하면(playConsecutivePasses가 2가 되면) 대국이 자동으로 끝난다.
+    function playPass(isAiPass) {
         if (playGameEnded) return;
-        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy }, lastMove: playLastMove });
+        playHistory.push({ board: clonePlayBoard(playBoard), turn: playTurn, capturedBy: { ...playCapturedBy }, lastMove: playLastMove, passes: playConsecutivePasses });
+        playConsecutivePasses++;
         playTurn = playTurn === 'black' ? 'white' : 'black';
-        document.getElementById('play-message').innerText = '';
+        document.getElementById('play-message').innerText = isAiPass ? 'AI가 더 둘 만한 곳이 없어서 차례를 넘겼어요.' : '';
         renderPlayTurnIndicator();
+        if (playConsecutivePasses >= 2) {
+            playEndGame();
+            return;
+        }
         if (playMode === 'ai' && playTurn === 'white') {
             setTimeout(aiTakeTurn, 450);
         }
@@ -3322,7 +3335,7 @@
     // 초반 화점 선호, 사다리가 실제로 통하는지, 단수된 내 돌을 살리는지까지 반영해서
     // "잡을 게 없는 국면"에서도 방향성 있게 두고 돌을 지키고 압박하는 판단을 하도록 한다.
     // myAtariLibertyPoints: 초보 이상 난이도에서만 쓰는, 지금 단수인 내 무리들의 구원 지점 목록.
-    function evaluateAiMove(board, x, y, color, difficulty, myAtariLibertyPoints) {
+    function evaluateAiMove(board, x, y, color, difficulty, myAtariLibertyPoints, oppTerritorySet, myTerritorySet) {
         const opponent = color === 'black' ? 'white' : 'black';
         const result = tryPlayMove(board, x, y, color);
         let score = randInt(0, 2);
@@ -3331,6 +3344,18 @@
         const myGroup = getGroupAndLiberties(result.board, x, y);
         score += Math.min(myGroup.liberties, 4);
         if (myGroup.liberties === 1) score -= 10; // 스스로 단수에 놓이는 수는 피한다
+
+        // 이미 상대 집으로 완전히 둘러싸여 확정된 자리 - 그 구역의 경계가 전부 상대 돌뿐이라는
+        // 뜻이므로(빈틈이 있었다면 애초에 "확정 집"으로 잡히지 않았을 것) 잡는 게 없는 한 어디에
+        // 둬도 이어질 아군이 전혀 없다. 활로 개수와 무관하게 뻔히 잡아먹힐 수이므로 크게 감점한다.
+        if (oppTerritorySet && oppTerritorySet.has(x + '_' + y) && result.captured.length === 0) {
+            score -= 35;
+        }
+        // 잡는 것도 없이 이미 확정된 내 집을 메우는 수 - 후보 필터링(candidateMoves)에서 대부분
+        // 걸러지지만, 다른 둘 곳이 아예 없어 전체 수를 그대로 채점해야 할 때를 대비한 안전장치.
+        if (myTerritorySet && myTerritorySet.has(x + '_' + y) && result.captured.length === 0) {
+            score -= 30;
+        }
 
         // 이 수로 상대 무리를 단수로 몰았다면 가산점. 활로 2개로 몰아넣은 경우(사다리 모양)엔
         // 실제로 사다리가 통하는지 확인해서, 안 통하는 헛된 추격에는 점수를 주지 않는다.
@@ -3394,25 +3419,61 @@
         return score;
     }
 
+    // 판을 봐서 "이미 확정된 내 집" / "이미 확정된 상대 집" 좌표 집합을 만든다. 이 두 정보로
+    // AI가 (1) 잡는 것도 없이 자기 집을 그냥 메우는 수와 (2) 뻔히 잡아먹힐 상대 집 침입을
+    // 피하게 한다 - 종국 무렵 "둘 곳이 없어서 아무 데나 두는" 기본적으로 어긋난 행동을 막는다.
+    function computeTerritoryOwnership(board, color) {
+        const opponent = color === 'black' ? 'white' : 'black';
+        const t = computePlayScore(board);
+        const mySet = new Set(), oppSet = new Set();
+        t.territoryCells.forEach(c => {
+            (c.side === color ? mySet : oppSet).add(c.x + '_' + c.y);
+        });
+        return { mySet, oppSet };
+    }
+
     function aiChooseMove(board, color, difficulty, koBoard) {
         const moves = listLegalMoves(board, color, koBoard);
         if (moves.length === 0) return null;
 
+        // computePlayScore의 "집" 판정은 "이 빈 구역이 한쪽 색에만 닿아있는가"만 본다 - 바둑판이
+        // 거의 비어있는 초반에는(예: 상대가 방금 첫 수를 뒀을 뿐) 아직 아무도 안 가본 것뿐인
+        // 빈 공간 전체가 "상대 집"으로 잘못 잡힌다(내 돌이 하나도 없으니 그 무엇과도 안 닿을 뿐).
+        // 실제로 경계가 만들어졌을 법한 후반부(돌이 어느 정도 쌓인 뒤)에만 이 판정을 신뢰해서
+        // 자기 집 메우기/헛된 침입 방지 로직을 켠다 - 그래야 초반 수까지 이유 없이 패스하지 않는다.
+        const isLateGame = countStonesOnBoard(board) >= 20;
+        let myTerritorySet = new Set(), oppTerritorySet = new Set();
+        if (isLateGame) {
+            ({ mySet: myTerritorySet, oppSet: oppTerritorySet } = computeTerritoryOwnership(board, color));
+        }
+        // 잡는 것도 없이 (1) 이미 확정된 내 집을 그냥 메우거나 (2) 완전히 둘러싸여 확정된 상대
+        // 집에 들어가는 수는 후보에서 아예 뺀다. 두 경우 다 순전히 손해이거나(내 집 1개를 스스로
+        // 없앰) 애초에 이어질 아군이 전혀 없어 뻔히 잡아먹히는 수라서, 다른 둘 곳이 남아있는 한
+        // 난이도와 무관하게 제외한다 - "약한 수"가 아니라 "말이 안 되는 수"이기 때문이다.
+        const productiveMoves = moves.filter(m => {
+            const key = m.x + '_' + m.y;
+            if (!myTerritorySet.has(key) && !oppTerritorySet.has(key)) return true;
+            return tryPlayMove(board, m.x, m.y, color).captured.length > 0;
+        });
+        const candidateMoves = productiveMoves.length > 0 ? productiveMoves : moves;
+
         if (difficulty === 'beginner0') {
-            return moves[randInt(0, moves.length - 1)];
+            return candidateMoves[randInt(0, candidateMoves.length - 1)];
         }
         if (difficulty === 'beginner') {
-            const capturing = moves.filter(m => tryPlayMove(board, m.x, m.y, color).captured.length > 0);
-            const safe = moves.filter(m => {
+            const capturing = candidateMoves.filter(m => tryPlayMove(board, m.x, m.y, color).captured.length > 0);
+            const safe = candidateMoves.filter(m => {
                 const r = tryPlayMove(board, m.x, m.y, color);
                 const g = getGroupAndLiberties(r.board, m.x, m.y);
                 return g.liberties > 1 || r.captured.length > 0;
             });
-            const pool = capturing.length > 0 ? capturing : (safe.length > 0 ? safe : moves);
+            const pool = capturing.length > 0 ? capturing : (safe.length > 0 ? safe : candidateMoves);
             // 무작위로 고르지 않고 그 안에서 그나마 나은 수를 고른다(사다리/단수 구원 판단은 없음 - 그래도
             // 왕초보보다는 낫고 중수보다는 뚜렷하게 약하도록 남겨둔다).
-            const scoredPool = pool.map(m => ({ m: m, s: evaluateAiMove(board, m.x, m.y, color, difficulty) }));
+            const scoredPool = pool.map(m => ({ m: m, s: evaluateAiMove(board, m.x, m.y, color, difficulty, null, oppTerritorySet, myTerritorySet) }));
             scoredPool.sort((a, b) => b.s - a.s);
+            // 남은 수가 전부 뻔한 침입/손해뿐이면(점수가 뚜렷하게 마이너스면) 그냥 차례를 넘긴다.
+            if (scoredPool[0].s < -15) return null;
             const bestPoolScore = scoredPool[0].s;
             const bestPool = scoredPool.filter(c => c.s === bestPoolScore).map(c => c.m);
             return bestPool[randInt(0, bestPool.length - 1)];
@@ -3421,8 +3482,12 @@
         // 중수 / 고수 공통: 이미 단수인 내 무리를 먼저 한 번만 계산해두고(후보마다 반복하면 비싸다),
         // 모든 후보 수를 평가해서 점수순으로 정렬한다.
         const myAtariLibertyPoints = findAtariLibertyPoints(board, color);
-        const scored = shuffle(moves).map(m => ({ m: m, s: evaluateAiMove(board, m.x, m.y, color, difficulty, myAtariLibertyPoints) }));
+        const scored = shuffle(candidateMoves).map(m => ({ m: m, s: evaluateAiMove(board, m.x, m.y, color, difficulty, myAtariLibertyPoints, oppTerritorySet, myTerritorySet) }));
         scored.sort((a, b) => b.s - a.s);
+
+        // 가장 좋다는 수조차 뚜렷한 손해(자기 집 메우기/헛된 침입 등)뿐이면, 그 수를 두지 않고
+        // 차례를 넘긴다 - 두 번 연속 패스되면 대국이 자동으로 끝난다(playPass 참고).
+        if (scored[0].s < -15) return null;
 
         if (difficulty === 'mid') {
             const bestScore = scored[0].s;
@@ -3452,7 +3517,7 @@
         if (playGameEnded || playMode !== 'ai' || playTurn !== 'white') return;
         const koBoard = playHistory.length > 0 ? playHistory[playHistory.length - 1].board : null;
         const move = aiChooseMove(playBoard, 'white', playAiDifficulty, koBoard);
-        if (!move) { playPass(); return; }
+        if (!move) { playPass(true); return; }
         attemptPlayMove(move.x, move.y);
     }
 
