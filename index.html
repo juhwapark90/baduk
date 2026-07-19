@@ -512,7 +512,7 @@
         </div>
 
         <div class="message" id="message"></div>
-        <button class="btn btn-back" onclick="goHome()">◀ 주제 목록으로</button>
+        <button class="btn btn-back" onclick="backToTopicList()">◀ 주제 목록으로</button>
     </div>
 </div>
 
@@ -526,8 +526,18 @@
         <div class="result-save-msg" id="result-save-msg"></div>
         <div class="result-btns">
             <button class="home-btn" onclick="retryTopic()">🔄 이 주제 다시 도전</button>
-            <button class="home-btn" onclick="goHome()">🏠 주제 목록</button>
+            <button class="home-btn" onclick="backToTopicList()">🏠 주제 목록</button>
         </div>
+    </div>
+</div>
+
+<!-- 세부 항목 선택 화면 (Lv.5처럼 여러 세부 항목으로 나뉜 레벨) -->
+<div id="screen-sublevel-select" class="screen">
+    <div class="container">
+        <h2 id="sublevel-title">세부 항목</h2>
+        <p class="subtitle" id="sublevel-sub"></p>
+        <div class="topic-list" id="sublevel-list"></div>
+        <button class="btn btn-back" onclick="goHome()">◀ 레벨 목록으로</button>
     </div>
 </div>
 
@@ -671,21 +681,48 @@
     // 최고 기록이 CLEAR_THRESHOLD 이상이면 클리어로 인정하고 다음 레벨이 열린다.
     const SCORE_MAX = 100;
     const CLEAR_THRESHOLD = 90;
+    // Lv.5처럼 세부 항목(subLevels)이 있는 레벨은 항목 하나를 클리어할 때마다 이 점수를 받는다.
+    // 항목 5개 x 20점 = 100점이라 일반 레벨(0~100점, 클리어 기준 90점)과 같은 기준으로 다룰 수 있다.
+    const SUBLEVEL_POINTS = 20;
 
     // 예전 누적 방식으로 저장돼 100점을 넘는 값이 남아있을 수 있으므로 항상 100점 상한으로 읽는다.
     function topicPoints(record) {
         return Math.min(SCORE_MAX, (record && record.points) || 0);
     }
 
+    // 세부 항목(subLevels)이 있는 레벨(Lv.5)은 "항목별로 클리어했는지"를 모아서 점수/클리어
+    // 여부를 계산하고, 없는 레벨은 기존처럼 최고 기록으로 계산한다 - 홈 화면/잠금 해제/총 포인트가
+    // 전부 이 함수 하나만 보면 되도록 통일했다.
+    function topicScoreInfo(topic, character) {
+        if (!character) return { points: 0, cleared: false };
+        if (topic.subLevels) {
+            const rec = character.topics[topic.key];
+            const subs = (rec && rec.subs) || {};
+            let points = 0, allCleared = true;
+            topic.subLevels.forEach(sl => {
+                if (subs[sl.key] && subs[sl.key].cleared) points += SUBLEVEL_POINTS;
+                else allCleared = false;
+            });
+            return { points: Math.min(SCORE_MAX, points), cleared: allCleared };
+        }
+        const points = topicPoints(character.topics[topic.key]);
+        return { points, cleared: points >= CLEAR_THRESHOLD };
+    }
+
+    function getSubLevelRecord(topic, character, subKey) {
+        if (!character) return null;
+        const rec = character.topics[topic.key];
+        return (rec && rec.subs && rec.subs[subKey]) || null;
+    }
+
     function isTopicUnlocked(idx, character) {
         if (idx === 0) return true;
-        const prevRecord = character.topics[TOPICS[idx - 1].key];
-        return topicPoints(prevRecord) >= CLEAR_THRESHOLD;
+        return topicScoreInfo(TOPICS[idx - 1], character).cleared;
     }
 
     function countClearedTopics(character) {
         if (!character) return 0;
-        return TOPICS.filter(t => topicPoints(character.topics[t.key]) >= CLEAR_THRESHOLD).length;
+        return TOPICS.filter(t => topicScoreInfo(t, character).cleared).length;
     }
 
     // 캐릭터 전체 레벨 = 클리어한 레벨 수 + 1 (지금 도전 중인 레벨 번호)
@@ -703,7 +740,7 @@
     // 같은 레벨을 아무리 반복해도 그 레벨의 최고 기록 이상으로는 늘지 않는다.
     function totalEarnedPoints(character) {
         if (!character) return 0;
-        return TOPICS.reduce((sum, t) => sum + topicPoints(character.topics[t.key]), 0);
+        return TOPICS.reduce((sum, t) => sum + topicScoreInfo(t, character).points, 0);
     }
 
     // 상점에서 쓸 수 있는 잔액 = 총 획득 포인트 - 지금까지 구매에 쓴 포인트.
@@ -784,6 +821,33 @@
         saveProfile();
         const justCleared = prevBest < CLEAR_THRESHOLD && newBest >= CLEAR_THRESHOLD;
         return { justCleared, newCharacterLevel: characterLevel(character), scaledScore };
+    }
+
+    // Lv.5처럼 세부 항목(5-1~5-5)이 있는 레벨의 항목 하나를 채점한다. 항목별 최고 기록이 아니라
+    // "한 번이라도 클리어 기준(CLEAR_THRESHOLD)을 넘긴 적이 있는가"만 저장한다 - 클리어하면
+    // 그 항목은 항상 SUBLEVEL_POINTS(20점)를 받고, 이미 클리어한 항목을 다시 풀어도 점수는
+    // 그대로다(중복으로 더해지지 않음). 모든 항목이 클리어되면 그 레벨 전체가 클리어된다.
+    function saveSubLevelResult(topicKey, subKey, roundScore, roundMax) {
+        const character = getActiveCharacter();
+        if (!currentUser || !character) return null;
+        const topic = TOPICS.find(t => t.key === topicKey);
+        if (!character.topics[topicKey]) character.topics[topicKey] = {};
+        if (!character.topics[topicKey].subs) character.topics[topicKey].subs = {};
+        const subs = character.topics[topicKey].subs;
+        const wasCleared = !!(subs[subKey] && subs[subKey].cleared);
+        const scaledScore = Math.min(SUBLEVEL_POINTS, Math.round((roundScore / roundMax) * SUBLEVEL_POINTS));
+        const passed = scaledScore >= Math.round(SUBLEVEL_POINTS * (CLEAR_THRESHOLD / SCORE_MAX));
+        const nowCleared = wasCleared || passed;
+        subs[subKey] = { cleared: nowCleared, lastScaledScore: scaledScore, lastPlayed: Date.now() };
+        saveProfile();
+        const justCleared = !wasCleared && nowCleared;
+        const allSubsCleared = topic.subLevels.every(sl => subs[sl.key] && subs[sl.key].cleared);
+        return {
+            justCleared,
+            allSubsCleared: allSubsCleared && justCleared,
+            newCharacterLevel: characterLevel(character),
+            scaledScore
+        };
     }
 
     function renderAuthBar() {
@@ -1226,6 +1290,7 @@
     let totalScore = 0;
     let currentMistakes = 0;
     let currentTopicKey = null;
+    let currentSubLevelKey = null; // Lv.5처럼 세부 항목(5-1~5-5)이 있는 레벨에서, 지금 풀고 있는 항목의 key
 
     /* =========================================================
        공통 유틸리티
@@ -1371,336 +1436,6 @@
             { minX: 8, maxX: 8, minY: 2, maxY: 6 }
         ];
         return edges[randInt(0, edges.length - 1)];
-    }
-
-    /* =========================================================
-       ⑤ 기본 살리기
-    ========================================================= */
-    function genRescue(size) {
-        let r = makeGroupWithLiberties(size, 1);
-        if (!r) return genRescue(1);
-        return {
-            type: 'play_single',
-            blackStones: toObjArr(r.stones),
-            whiteStones: toObjArr(r.block),
-            answers: toObjArr(r.keep),
-            desc: '앗! 흑돌이 단수에 몰렸어요. 살아남는 자리를 찾아보세요!'
-        };
-    }
-
-    /* =========================================================
-       ④ 돌의 연결과 끊음
-    ========================================================= */
-    function genConnectCut(size, mode) {
-        for (let attempt = 0; attempt < 80; attempt++) {
-            let px = randInt(2, 6), py = randInt(2, 6);
-            let dirs = shuffle([[-1,0],[1,0],[0,-1],[0,1]]);
-            let dirA = dirs[0], dirB = dirs[1];
-            let startA = [px + dirA[0], py + dirA[1]];
-            let startB = [px + dirB[0], py + dirB[1]];
-            if (!inBounds(startA[0], startA[1]) || !inBounds(startB[0], startB[1])) continue;
-            let occ = new Set([key(px, py)]);
-            let groupA = growGroup(occ, size, startA[0], startA[1]);
-            if (groupA.length < size) continue;
-            let occ2 = new Set(groupA.map(([x, y]) => key(x, y)));
-            groupA.forEach(([x, y]) => neighbors4(x, y).forEach(([nx, ny]) => occ2.add(key(nx, ny))));
-            occ2.add(key(px, py));
-            let groupB = growGroup(occ2, size, startB[0], startB[1]);
-            if (groupB.length < size) continue;
-            let stones = toObjArr([...groupA, ...groupB]);
-            let isConnect = mode === 'connect';
-            return {
-                type: 'play_single',
-                blackStones: isConnect ? stones : [],
-                whiteStones: isConnect ? [] : stones,
-                answers: [{ x: px, y: py }],
-                desc: isConnect
-                    ? '두 흑돌 그룹이 끊어지지 않도록 연결하는 자리를 찾아 흑돌을 놓아보세요!'
-                    : '두 흰 돌 그룹을 서로 끊어놓는 자리를 찾아 흑돌을 놓아보세요!'
-            };
-        }
-        return null;
-    }
-
-    /* =========================================================
-       ⑥ 복단수
-    ========================================================= */
-    function genDoubleAtari(sizeA, sizeB) {
-        for (let attempt = 0; attempt < 80; attempt++) {
-            let px = randInt(2, 6), py = randInt(2, 6);
-            let dirs = shuffle([[-1,0],[1,0],[0,-1],[0,1]]);
-            let dirA = dirs[0], dirB = dirs[1];
-            let startA = [px + dirA[0], py + dirA[1]];
-            let startB = [px + dirB[0], py + dirB[1]];
-            if (!inBounds(startA[0], startA[1]) || !inBounds(startB[0], startB[1])) continue;
-            let occA = new Set([key(px, py)]);
-            let groupA = growGroup(occA, sizeA, startA[0], startA[1]);
-            if (groupA.length < sizeA) continue;
-            let bufferA = new Set(groupA.map(([x, y]) => key(x, y)));
-            groupA.forEach(([x, y]) => neighbors4(x, y).forEach(([nx, ny]) => bufferA.add(key(nx, ny))));
-            bufferA.add(key(px, py));
-            let groupB = growGroup(bufferA, sizeB, startB[0], startB[1]);
-            if (groupB.length < sizeB) continue;
-
-            let occA2 = new Set(groupA.map(([x, y]) => key(x, y)));
-            let libsA = computeLibs(groupA, occA2).filter(([x, y]) => !(x === px && y === py));
-            let occB2 = new Set(groupB.map(([x, y]) => key(x, y)));
-            let libsB = computeLibs(groupB, occB2).filter(([x, y]) => !(x === px && y === py));
-            if (libsA.length < 1 || libsB.length < 1) continue;
-            shuffle(libsA); shuffle(libsB);
-            let blockA = libsA.slice(1);
-            let blockB = libsB.slice(1);
-
-            let allWhite = [...groupA, ...groupB];
-            let allBlack = [...blockA, ...blockB];
-            let whiteKeys = new Set(allWhite.map(([x, y]) => key(x, y)));
-            if (allBlack.some(([x, y]) => whiteKeys.has(key(x, y)))) continue;
-
-            return {
-                type: 'play_single',
-                blackStones: toObjArr(allBlack),
-                whiteStones: toObjArr(allWhite),
-                answers: [{ x: px, y: py }],
-                desc: '한 번의 수로 두 개의 흰 돌 무리를 동시에 단수칠 수 있는 자리를 찾아보세요! (복단수)'
-            };
-        }
-        return null;
-    }
-
-    /* =========================================================
-       ⑦ 연단수  /  ⑧ 축 (같은 엔진, 지역만 다르게)
-    ========================================================= */
-    function genAtariChaseCore(size, region, desc) {
-        for (let attempt = 0; attempt < 80; attempt++) {
-            let sx = randInt(region.minX, region.maxX), sy = randInt(region.minY, region.maxY);
-            let occ = new Set([key(sx, sy)]);
-            let stones = growGroup(occ, size, sx, sy);
-            if (stones.length < size) continue;
-            let occ2 = new Set(stones.map(([x, y]) => key(x, y)));
-            let libs = computeLibs(stones, occ2);
-            if (libs.length < 2) continue;
-            shuffle(libs);
-            let keep = libs.slice(0, 2), block = libs.slice(2);
-            let [P1, P2] = keep;
-            let d1 = Math.min(P1[0], 8 - P1[0], P1[1], 8 - P1[1]);
-            let d2 = Math.min(P2[0], 8 - P2[0], P2[1], 8 - P2[1]);
-            let correct = d1 <= d2 ? P1 : P2;
-            let other = d1 <= d2 ? P2 : P1;
-            let usedSet = new Set([
-                ...occ2, ...block.map(([x, y]) => key(x, y)),
-                key(correct[0], correct[1]), key(other[0], other[1])
-            ]);
-            let newN = neighbors4(other[0], other[1]).filter(([nx, ny]) => !usedSet.has(key(nx, ny)));
-            shuffle(newN);
-            let extraBlocks = newN.length >= 1 ? newN.slice(1) : [];
-            let allBlack = [...block, ...extraBlocks];
-            return {
-                type: 'play_single',
-                blackStones: toObjArr(allBlack),
-                whiteStones: toObjArr(stones),
-                answers: [{ x: correct[0], y: correct[1] }],
-                desc
-            };
-        }
-        return null;
-    }
-
-    function genChainAtari(size) {
-        let region = { minX: 2, maxX: 6, minY: 2, maxY: 6 };
-        let r = genAtariChaseCore(size, region,
-            '흰 돌을 단수치면, 도망가도 계속 단수가 이어져서 결국 잡혀요! 그 자리를 찾아보세요! (연단수)');
-        return r || genChainAtari(1);
-    }
-
-    function genLadder(size) {
-        let edges = [
-            { minX: 0, maxX: 1, minY: 1, maxY: 7 },
-            { minX: 7, maxX: 8, minY: 1, maxY: 7 },
-            { minX: 1, maxX: 7, minY: 0, maxY: 1 },
-            { minX: 1, maxX: 7, minY: 7, maxY: 8 }
-        ];
-        let region = edges[randInt(0, 3)];
-        let r = genAtariChaseCore(size, region,
-            '흰 돌을 몰아서 도망갈 수 없게 만드는 단수 자리를 찾아보세요! (축의 원리: 가장자리 쪽으로 몰아야 해요)');
-        return r || genLadder(1);
-    }
-
-    /* =========================================================
-       템플릿 변환 도구 (회전/대칭/평행이동)
-    ========================================================= */
-    function rotPoint(x, y, rot) {
-        switch (rot) {
-            case 90: return [-y, x];
-            case 180: return [-x, -y];
-            case 270: return [y, -x];
-            default: return [x, y];
-        }
-    }
-    function transformCoords(list, rot, mirror) {
-        return list.map(([x, y]) => {
-            let px = mirror ? -x : x;
-            return rotPoint(px, y, rot);
-        });
-    }
-    function placeTemplate(bRel, wRel, aRel, extraRel) {
-        extraRel = extraRel || [];
-        let rot = [0, 90, 180, 270][randInt(0, 3)];
-        let mirror = Math.random() < 0.5;
-        let bT = transformCoords(bRel, rot, mirror);
-        let wT = transformCoords(wRel, rot, mirror);
-        let aT = transformCoords(aRel, rot, mirror);
-        let exT = transformCoords(extraRel, rot, mirror);
-        let all = [...bT, ...wT, ...aT, ...exT];
-        let minX = Math.min(...all.map(p => p[0])), maxX = Math.max(...all.map(p => p[0]));
-        let minY = Math.min(...all.map(p => p[1])), maxY = Math.max(...all.map(p => p[1]));
-        let shiftX = randInt(0, 8 - (maxX - minX)) - minX;
-        let shiftY = randInt(0, 8 - (maxY - minY)) - minY;
-        let toObj = arr => arr.map(([x, y]) => ({ x: x + shiftX, y: y + shiftY }));
-        return { black: toObj(bT), white: toObj(wT), answers: toObj(aT) };
-    }
-
-    // 코너(모서리) 고정 배치 - 진짜 바둑판 가장자리를 활용하는 문제용
-    function cornerAnchor(p, corner) {
-        let [x, y] = p;
-        switch (corner) {
-            case 1: return [8 - y, x];
-            case 2: return [8 - x, 8 - y];
-            case 3: return [y, 8 - x];
-            default: return [x, y];
-        }
-    }
-    function placeCornerTemplate(bRel, aRel, slideMax) {
-        slideMax = slideMax || 0;
-        let slide = slideMax > 0 ? randInt(0, slideMax) : 0;
-        let shiftFn = ([x, y]) => [x + slide, y];
-        let corner = randInt(0, 3);
-        let bAbs = bRel.map(shiftFn).map(p => cornerAnchor(p, corner));
-        let aAbs = aRel.map(shiftFn).map(p => cornerAnchor(p, corner));
-        return { black: toObjArr(bAbs), answers: toObjArr(aAbs) };
-    }
-
-    /* =========================================================
-       ⑨ 장문과 봉쇄
-    ========================================================= */
-    function genNet() {
-        let bRel = [[-1,0],[0,-1],[2,0],[1,-1],[0,2],[-1,1]];
-        let wRel = [[0,0]];
-        let aRel = [[1,1]];
-        let p = placeTemplate(bRel, wRel, aRel);
-        return {
-            type: 'play_single',
-            blackStones: p.black,
-            whiteStones: p.white,
-            answers: p.answers,
-            desc: '흰 돌에 직접 닿지 않으면서도 도망갈 곳을 모두 막는 자리를 찾아보세요! (장문)'
-        };
-    }
-
-    /* =========================================================
-       ⑩ 기초 사활 (두집 만들기 / 옥집 구별)
-    ========================================================= */
-    function genBent3() {
-        let bRel = [[-1,0],[0,-1],[2,0],[1,-1],[1,1],[-1,1],[0,2]];
-        let aRel = [[0,0]];
-        let exRel = [[1,0],[0,1]];
-        let p = placeTemplate(bRel, [], aRel, exRel);
-        return {
-            type: 'play_single',
-            blackStones: p.black, whiteStones: [], answers: p.answers,
-            desc: '구부러진 흑집의 급소를 찾아 두 집을 만들어보세요!'
-        };
-    }
-    function genStraight3() {
-        let bRel = [[-1,0],[3,0],[0,-1],[1,-1],[2,-1],[0,1],[1,1],[2,1]];
-        let aRel = [[1,0]];
-        let exRel = [[0,0],[2,0]];
-        let p = placeTemplate(bRel, [], aRel, exRel);
-        return {
-            type: 'play_single',
-            blackStones: p.black, whiteStones: [], answers: p.answers,
-            desc: '흑집의 급소를 찾아 두 집을 만들어 완전히 살아보세요!'
-        };
-    }
-    function genTrueFalseEye() {
-        let bRel = [
-            [-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1],
-            [3,0],[5,0],[4,-1],[4,1],[5,1]
-        ];
-        let wRel = [[3,-1],[5,-1],[3,1]];
-        let aRel = [[0,0]];
-        let exRel = [[4,0]];
-        let p = placeTemplate(bRel, wRel, aRel, exRel);
-        return {
-            type: 'play_single',
-            blackStones: p.black, whiteStones: p.white, answers: p.answers,
-            desc: '두 흑집 중에서 진짜 눈(살아있는 집)을 찾아 표시해보세요! 가짜 집(옥집)을 조심하세요!'
-        };
-    }
-
-    /* =========================================================
-       ⑪ 고급 전술 (환격, 먹여치기, 끼우기)
-    ========================================================= */
-    function genSnapback() {
-        let wRel = [[0,0],[1,0]];
-        let bRel = [[-1,0],[0,-1],[1,-1],[2,0],[1,1]];
-        let aRel = [[0,1]];
-        let p = placeTemplate(bRel, wRel, aRel);
-        return {
-            type: 'play_single',
-            blackStones: p.black, whiteStones: p.white, answers: p.answers,
-            desc: '흰 돌 2개를 한 번에 잡을 수 있는 자리를 찾아보세요! 이런 모양을 "환격"이라고 해요.'
-        };
-    }
-    function genFeed() {
-        let wRel = [[0,0],[1,0],[1,1]];
-        let bRel = [[-1,0],[0,-1],[2,0],[1,-1],[2,1],[1,2]];
-        let aRel = [[0,1]];
-        let p = placeTemplate(bRel, wRel, aRel);
-        return {
-            type: 'play_single',
-            blackStones: p.black, whiteStones: p.white, answers: p.answers,
-            desc: '흰 돌 3개를 한 번에 잡을 수 있는 자리를 찾아보세요! 상대 안으로 파고드는 "먹여치기" 기술이에요.'
-        };
-    }
-    function genWedge() {
-        let r = genConnectCut(1, 'cut') || genConnectCut(1, 'cut');
-        if (!r) return genSnapback();
-        r.desc = '두 흰 돌 사이에 끼어들어 갈라놓는 자리를 찾아보세요! ("끼우기" 기술이에요)';
-        return r;
-    }
-
-    /* =========================================================
-       ⑫ 실전 사활 (궁도 넓히기/줄이기)
-    ========================================================= */
-    function genLifeCorner() {
-        let bRel = [[2,0],[1,1],[0,2]];
-        let aRel = [[0,0]];
-        let p = placeCornerTemplate(bRel, aRel, 0);
-        return {
-            type: 'play_single',
-            blackStones: p.black, whiteStones: [], answers: p.answers,
-            desc: '구석에 몰린 흑집의 급소를 찾아 두 집을 만들어보세요!'
-        };
-    }
-    function genLifeEdgeStraight3() {
-        let bRel = [[0,0],[4,0],[1,1],[2,1],[3,1]];
-        let aRel = [[2,0]];
-        let p = placeCornerTemplate(bRel, aRel, 4);
-        return {
-            type: 'play_single',
-            blackStones: p.black, whiteStones: [], answers: p.answers,
-            desc: '가장자리에 있는 흑집의 급소를 찾아 두 집을 만들어보세요!'
-        };
-    }
-    function genLifeEdgeT() {
-        let bRel = [[0,0],[4,0],[1,1],[3,1],[2,2]];
-        let aRel = [[2,0]];
-        let p = placeCornerTemplate(bRel, aRel, 4);
-        return {
-            type: 'play_single',
-            blackStones: p.black, whiteStones: [], answers: p.answers,
-            desc: '궁도가 넓은 흑집이에요. 급소를 찾아 안전하게 두 집 이상을 만들어보세요!'
-        };
     }
 
     /* =========================================================
@@ -2389,32 +2124,31 @@
           tiers: [() => genTerritoryProblem('simple'), () => genTerritoryProblem('complex'), () => genTerritoryTrick()] },
         { key: 'liberty', title: '[Lv. 4] 활로찾기', sub: '돌이 살아있는 숨구멍을 모두 찾아요',
           tiers: [() => genLiberty(1), () => genLiberty(2), () => genLiberty(3)] },
-        { key: 'atari', title: '[Lv. 5] 단수의 기술', sub: '상대 돌의 활로를 1개로 줄여요',
-          tiers: [() => genAtari(1), () => genAtari(2), () => genAtari(3)] },
+        // [Lv. 5] 활로가 적은 곳으로 공격하자: 하나의 퀴즈가 아니라 5-1~5-5 다섯 개의 세부 항목으로
+        // 구성된다. 각 항목을 클리어할 때마다 20점씩 얻고(5개 x 20점 = 100점), 다섯 항목을 모두
+        // 클리어해야 이 레벨 전체가 클리어되어 Lv.6이 열린다. 지금은 뼈대만 만든 상태라 각 항목은
+        // 기존 단수(genAtari) 문제 생성기를 그대로 재사용한 임시 구성이다 - 나중에 내용을 다듬는다.
+        { key: 'atariattack', title: '[Lv. 5] 활로가 적은 곳으로 공격하자', sub: '활로가 적은 상대 돌을 찾아 먼저 공격해요',
+          subLevels: [
+              { key: 'atariattack1', title: '5-1. 활로가 적은 돌 찾기', tiers: [() => genAtari(1)], counts: [5] },
+              { key: 'atariattack2', title: '5-2. 여러 개로 이어진 돌 공격하기', tiers: [() => genAtari(2)], counts: [5] },
+              { key: 'atariattack3', title: '5-3. 구석에 있는 돌 공격하기', tiers: [
+                  () => {
+                      const r = makeGroupWithLiberties(1, 2, randomCornerRegion());
+                      return r ? { type: 'play_single', blackStones: toObjArr(r.block), whiteStones: toObjArr(r.stones), answers: toObjArr(r.keep), desc: '구석에 있는 흰 돌이에요. 활로가 적은 곳을 찾아 공격해보세요!' } : genAtari(1);
+                  }
+              ], counts: [5] },
+              { key: 'atariattack4', title: '5-4. 가장자리에 있는 돌 공격하기', tiers: [
+                  () => {
+                      const r = makeGroupWithLiberties(1, 2, randomEdgeRegion());
+                      return r ? { type: 'play_single', blackStones: toObjArr(r.block), whiteStones: toObjArr(r.stones), answers: toObjArr(r.keep), desc: '가장자리에 있는 흰 돌이에요. 활로가 적은 곳을 찾아 공격해보세요!' } : genAtari(1);
+                  }
+              ], counts: [5] },
+              { key: 'atariattack5', title: '5-5. 큰 무리 공격하기', tiers: [() => genAtari(3)], counts: [5] }
+          ] },
         { key: 'capture', title: '[Lv. 6] 따내기', sub: '단수된 돌을 완전히 잡아요',
           tiers: [() => genCapture(1), () => genCapture(2), () => genCapture(3)] },
-        { key: 'connect', title: '[Lv. 7] 돌의 연결과 끊음', sub: '기본 수읽기: 이어야 할 곳, 끊어야 할 곳',
-          tiers: [
-              () => genConnectCut(1, Math.random() < 0.5 ? 'connect' : 'cut'),
-              () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut'),
-              () => genConnectCut(2, Math.random() < 0.5 ? 'connect' : 'cut')
-          ] },
-        { key: 'rescue', title: '[Lv. 8] 기본 살리기', sub: '단수된 우리 돌을 살려서 도망가요',
-          tiers: [() => genRescue(1), () => genRescue(2), () => genRescue(3)] },
-        { key: 'doubleatari', title: '[Lv. 9] 복단수', sub: '한 수로 두 그룹을 동시에 단수쳐요',
-          tiers: [() => genDoubleAtari(1,1), () => genDoubleAtari(1,2), () => genDoubleAtari(2,2)] },
-        { key: 'chainatari', title: '[Lv. 10] 연단수', sub: '도망가도 계속 단수가 이어지는 자리',
-          tiers: [() => genChainAtari(1), () => genChainAtari(1), () => genChainAtari(2)] },
-        { key: 'ladder', title: '[Lv. 11] 축', sub: '가장자리로 몰아서 완전히 잡아요',
-          tiers: [() => genLadder(1), () => genLadder(1), () => genLadder(2)] },
-        { key: 'basicdeath', title: '[Lv. 12] 기초 사활', sub: '두 집 만들기와 옥집(가짜 집) 구별하기',
-          tiers: [() => genBent3(), () => genStraight3(), () => genTrueFalseEye()] },
-        { key: 'net', title: '[Lv. 13] 장문과 봉쇄', sub: '직접 닿지 않고 상대를 가둬요',
-          tiers: [() => genNet(), () => genNet(), () => genNet()] },
-        { key: 'advanced', title: '[Lv. 14] 고급 전술', sub: '환격 · 먹여치기 · 끼우기',
-          tiers: [() => genSnapback(), () => genFeed(), () => genWedge()] },
-        { key: 'practicaldeath', title: '[Lv. 15] 실전 사활', sub: '궁도를 넓혀서 안전하게 살아요',
-          tiers: [() => genLifeCorner(), () => genLifeEdgeStraight3(), () => genLifeEdgeT()] }
+        { key: 'comingsoon7', title: '[Lv. 7] (준비중)', sub: '곧 만나요! 조금만 기다려주세요 🙏', disabled: true }
     ];
 
     /* =========================================================
@@ -2427,9 +2161,21 @@
         const hasCharacter = !!(currentUser && character);
         TOPICS.forEach((t, idx) => {
             let btn = document.createElement('button');
-            let record = hasCharacter && character.topics[t.key];
-            let points = topicPoints(record);
-            let isCleared = points >= CLEAR_THRESHOLD;
+
+            if (t.disabled) {
+                btn.className = 'topic-btn locked';
+                btn.innerHTML = `
+                    <div class="topic-top-row"><span>🔒 ${t.title}</span></div>
+                    <span class="desc-line">${t.sub}</span>
+                `;
+                btn.onclick = () => alert('아직 준비 중이에요! 조금만 기다려주세요 🙏');
+                list.appendChild(btn);
+                return;
+            }
+
+            let scoreInfo = hasCharacter ? topicScoreInfo(t, character) : { points: 0, cleared: false };
+            let points = scoreInfo.points;
+            let isCleared = scoreInfo.cleared;
             let unlocked = hasCharacter && isTopicUnlocked(idx, character);
             let locked = !hasCharacter || !unlocked;
             btn.className = 'topic-btn' + (locked ? ' locked' : '');
@@ -2441,6 +2187,14 @@
                 progressLine = '';
             } else if (!unlocked) {
                 progressLine = `<span class="topic-progress-text">이전 레벨을 클리어하면 열려요</span>`;
+            } else if (t.subLevels) {
+                let clearedCount = t.subLevels.filter(sl => {
+                    let rec = getSubLevelRecord(t, character, sl.key);
+                    return rec && rec.cleared;
+                }).length;
+                progressLine = `
+                    <div class="topic-progress-bg"><div class="topic-progress-fill" style="width:${points}%"></div></div>
+                    <span class="topic-progress-text">세부 항목 ${clearedCount}/${t.subLevels.length}개 클리어 (${points}/${SCORE_MAX}점)</span>`;
             } else {
                 let remain = isCleared ? '' : ` (클리어까지 ${CLEAR_THRESHOLD - points}점)`;
                 progressLine = `
@@ -2448,8 +2202,13 @@
                     <span class="topic-progress-text">${points}/${SCORE_MAX}점 (최고 기록)${remain}</span>`;
             }
 
-            let quizCount = (t.counts || [7, 7, 6]).reduce((a, b) => a + b, 0);
-            let modeNote = t.learnSlides ? `개념 배우기 + 퀴즈 ${quizCount}문제` : `랜덤 ${quizCount}문제`;
+            let modeNote;
+            if (t.subLevels) {
+                modeNote = `세부 항목 ${t.subLevels.length}개 (항목당 ${SUBLEVEL_POINTS}점)`;
+            } else {
+                let quizCount = (t.counts || [7, 7, 6]).reduce((a, b) => a + b, 0);
+                modeNote = t.learnSlides ? `개념 배우기 + 퀴즈 ${quizCount}문제` : `랜덤 ${quizCount}문제`;
+            }
             btn.innerHTML = `
                 <div class="topic-top-row">
                     <span>${lockIcon}${t.title}</span>
@@ -2474,15 +2233,28 @@
         switchScreen('screen-home');
     }
 
+    // 퀴즈 화면/결과 화면의 "주제 목록으로" 버튼용 - 세부 항목(Lv.5) 퀴즈를 풀던 중이면
+    // 완전히 홈으로 나가지 않고 그 레벨의 항목 선택 화면으로 돌아간다.
+    function backToTopicList() {
+        if (currentSubLevelKey) {
+            openSubLevelSelect(currentTopicKey);
+        } else {
+            goHome();
+        }
+    }
+
     function startTopic(topicKey) {
         if (!currentUser) { alert('먼저 구글 로그인을 해주세요!'); return; }
         const character = getActiveCharacter();
         if (!character) { openCharacterSelect(); return; }
         const idx = TOPICS.findIndex(t => t.key === topicKey);
+        let topic = TOPICS[idx];
+        if (topic.disabled) { alert('아직 준비 중이에요! 조금만 기다려주세요 🙏'); return; }
         if (!isTopicUnlocked(idx, character)) { alert('이전 레벨을 먼저 클리어해야 열려요!'); return; }
         currentTopicKey = topicKey;
-        let topic = TOPICS.find(t => t.key === topicKey);
-        if (topic.learnSlides) {
+        if (topic.subLevels) {
+            openSubLevelSelect(topicKey);
+        } else if (topic.learnSlides) {
             document.getElementById('topic-intro-title').innerText = topic.title;
             document.getElementById('topic-intro-sub').innerText = topic.sub;
             switchScreen('screen-topic-intro');
@@ -2493,6 +2265,7 @@
 
     function beginTopicQuiz(topicKey) {
         currentTopicKey = topicKey;
+        currentSubLevelKey = null;
         let topic = TOPICS.find(t => t.key === topicKey);
         problemsList = generateTopicSet(topic.tiers, topic.counts);
         currentProblemIndex = 0;
@@ -2502,7 +2275,61 @@
         switchScreen('screen-game');
     }
 
-    function retryTopic() { beginTopicQuiz(currentTopicKey); }
+    /* =========================================================
+       세부 항목이 있는 레벨(Lv.5: 5-1~5-5) - 항목 선택 화면 / 퀴즈 시작
+    ========================================================= */
+    function openSubLevelSelect(topicKey) {
+        currentTopicKey = topicKey;
+        currentSubLevelKey = null;
+        const topic = TOPICS.find(t => t.key === topicKey);
+        document.getElementById('sublevel-title').innerText = topic.title;
+        document.getElementById('sublevel-sub').innerText = topic.sub;
+        renderSubLevelList();
+        switchScreen('screen-sublevel-select');
+    }
+
+    function renderSubLevelList() {
+        const topic = TOPICS.find(t => t.key === currentTopicKey);
+        const character = getActiveCharacter();
+        const list = document.getElementById('sublevel-list');
+        list.innerHTML = '';
+        topic.subLevels.forEach(sl => {
+            const rec = getSubLevelRecord(topic, character, sl.key);
+            const cleared = !!(rec && rec.cleared);
+            let btn = document.createElement('button');
+            btn.className = 'topic-btn';
+            btn.innerHTML = `
+                <div class="topic-top-row">
+                    <span>${sl.title}</span>
+                    ${cleared ? '<span class="level-badge">✅ 클리어</span>' : ''}
+                </div>
+                <span class="desc-line">${cleared ? `클리어 완료 (+${SUBLEVEL_POINTS}점)` : `클리어하면 ${SUBLEVEL_POINTS}점 획득 · 문제 ${(sl.counts || []).reduce((a,b)=>a+b,0)}개`}</span>
+            `;
+            btn.onclick = () => beginSubLevelQuiz(topic.key, sl.key);
+            list.appendChild(btn);
+        });
+    }
+
+    function beginSubLevelQuiz(topicKey, subKey) {
+        currentTopicKey = topicKey;
+        currentSubLevelKey = subKey;
+        const topic = TOPICS.find(t => t.key === topicKey);
+        const sub = topic.subLevels.find(s => s.key === subKey);
+        problemsList = generateTopicSet(sub.tiers, sub.counts);
+        currentProblemIndex = 0;
+        totalScore = 0;
+        document.getElementById('game-title').innerText = sub.title;
+        initBoard();
+        switchScreen('screen-game');
+    }
+
+    function retryTopic() {
+        if (currentSubLevelKey) {
+            beginSubLevelQuiz(currentTopicKey, currentSubLevelKey);
+        } else {
+            beginTopicQuiz(currentTopicKey);
+        }
+    }
 
     /* =========================================================
        개념 배우기 슬라이드 (돌 잡아먹기 등, 실제 대국판과 같은 9x9 미니 바둑판)
@@ -2854,25 +2681,57 @@
         currentProblemIndex++;
         if (currentProblemIndex >= problemsList.length) {
             const roundMax = problemsList.length * 10;
-            const scaledScore = Math.min(SCORE_MAX, Math.round((totalScore / roundMax) * SCORE_MAX));
-            document.getElementById('final-score').innerText = scaledScore;
-            let topic = TOPICS.find(t => t.key === currentTopicKey);
-            document.getElementById('result-topic-msg').innerText =
-                `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
-            const saveMsgEl = document.getElementById('result-save-msg');
-            if (currentUser && getActiveCharacter()) {
-                const result = saveTopicResult(currentTopicKey, totalScore, roundMax);
-                renderCharacterHeader();
-                saveMsgEl.innerHTML = (result && result.justCleared)
-                    ? `기록이 저장됐어요! 🙌 🎉 레벨 클리어! 다음 레벨이 열렸어요! ${charLevelBadgeHtml(result.newCharacterLevel)}`
-                    : '기록이 저장됐어요! 🙌';
+            if (currentSubLevelKey) {
+                finishSubLevelQuiz(roundMax);
             } else {
-                saveMsgEl.innerText = '로그인하면 기록이 저장돼요. (홈 화면에서 로그인해보세요!)';
+                finishTopicQuiz(roundMax);
             }
-            switchScreen('screen-result');
         } else {
             loadProblem();
         }
+    }
+
+    function finishTopicQuiz(roundMax) {
+        const scaledScore = Math.min(SCORE_MAX, Math.round((totalScore / roundMax) * SCORE_MAX));
+        document.getElementById('final-score').innerText = scaledScore;
+        let topic = TOPICS.find(t => t.key === currentTopicKey);
+        document.getElementById('result-topic-msg').innerText =
+            `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
+        const saveMsgEl = document.getElementById('result-save-msg');
+        if (currentUser && getActiveCharacter()) {
+            const result = saveTopicResult(currentTopicKey, totalScore, roundMax);
+            renderCharacterHeader();
+            saveMsgEl.innerHTML = (result && result.justCleared)
+                ? `기록이 저장됐어요! 🙌 🎉 레벨 클리어! 다음 레벨이 열렸어요! ${charLevelBadgeHtml(result.newCharacterLevel)}`
+                : '기록이 저장됐어요! 🙌';
+        } else {
+            saveMsgEl.innerText = '로그인하면 기록이 저장돼요. (홈 화면에서 로그인해보세요!)';
+        }
+        switchScreen('screen-result');
+    }
+
+    function finishSubLevelQuiz(roundMax) {
+        const topic = TOPICS.find(t => t.key === currentTopicKey);
+        const sub = topic.subLevels.find(s => s.key === currentSubLevelKey);
+        const scaledScore = Math.min(SUBLEVEL_POINTS, Math.round((totalScore / roundMax) * SUBLEVEL_POINTS));
+        document.getElementById('final-score').innerText = scaledScore;
+        document.getElementById('result-topic-msg').innerText =
+            `"${sub.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
+        const saveMsgEl = document.getElementById('result-save-msg');
+        if (currentUser && getActiveCharacter()) {
+            const result = saveSubLevelResult(topic.key, currentSubLevelKey, totalScore, roundMax);
+            renderCharacterHeader();
+            if (result && result.allSubsCleared) {
+                saveMsgEl.innerHTML = `기록이 저장됐어요! 🙌 🎉 이 항목 클리어! (+${SUBLEVEL_POINTS}점) 그리고 [${topic.title}] 전체 클리어! 다음 레벨이 열렸어요! ${charLevelBadgeHtml(result.newCharacterLevel)}`;
+            } else if (result && result.justCleared) {
+                saveMsgEl.innerHTML = `기록이 저장됐어요! 🙌 이 항목 클리어! (+${SUBLEVEL_POINTS}점)`;
+            } else {
+                saveMsgEl.innerText = '기록이 저장됐어요! 🙌';
+            }
+        } else {
+            saveMsgEl.innerText = '로그인하면 기록이 저장돼요. (홈 화면에서 로그인해보세요!)';
+        }
+        switchScreen('screen-result');
     }
 
     /* =========================================================
