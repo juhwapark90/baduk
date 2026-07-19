@@ -333,6 +333,13 @@
         }
         .mini-stone.black { background: radial-gradient(circle at 30% 30%, #555, #111); }
         .mini-stone.white { background: radial-gradient(circle at 30% 30%, #fff, #d4d4d4); border: 1px solid #ccc; box-sizing: border-box; }
+        /* 승부 결정하기(Lv.3) 퀴즈: 이 판에서 잡은 돌 수를 숫자로 알려줘서, 집을 세고 여기에
+           더하면 직접 검증할 수 있게 한다(집만 세면 안 맞는 이유를 없앤다). */
+        .problem-captures-info {
+            display: flex; justify-content: center; gap: 18px; background: #f1f8f1; border: 2px solid #c3dec3;
+            border-radius: 8px; padding: 8px 12px; margin: -6px 0 12px; font-size: 13px; font-weight: bold; color: #2c5e43;
+        }
+        .problem-captures-info .cap-row { display: inline-flex; align-items: center; gap: 5px; }
         .play-turn-indicator {
             font-size: 15px; font-weight: bold; color: #2c5e43; margin-bottom: 10px; text-align: center;
         }
@@ -489,6 +496,8 @@
             <div class="grid-lines" id="grid-lines"></div>
             <div class="layer-intersections" id="intersections"></div>
         </div>
+
+        <div class="problem-captures-info" id="problem-captures-info" style="display:none;"></div>
 
         <div class="controls" id="choose-side-controls" style="display:none;">
             <button class="side-btn" id="side-btn-black" onclick="chooseSide('black')">⚫ 흑 승리</button>
@@ -1733,7 +1742,7 @@
 
             const built = buildStonesAndTerritory(ownerMap);
             if (!built) continue;
-            const diff = Math.abs(built.scoreA - built.scoreB);
+            const diff = territoryDiffOf(built.sideAStones, built.sideBStones);
             if (diff === 0) continue;
 
             fallback = built;
@@ -1848,7 +1857,7 @@
 
             const built = buildStonesAndTerritory(shape.ownerMap, shape.territoryKeys);
             if (!built) continue;
-            const diff = Math.abs(built.scoreA - built.scoreB);
+            const diff = territoryDiffOf(built.sideAStones, built.sideBStones);
             if (diff === 0) continue;
 
             const inRange = gapMode === 'medium' ? (diff >= 3 && diff <= 9) : (diff >= 1 && diff <= 4);
@@ -1906,10 +1915,6 @@
                 }
             }
 
-            // 실제 대국과 같은 방식으로 다시 계가 - 뚫린 무리는 자동으로 공배(0집) 처리된다.
-            const score = computePlayScore(board);
-            if (score.blackScore === score.whiteScore) continue;
-
             const blackStones = [], whiteStones = [];
             for (let y = 0; y < BOARD_SIZE; y++) {
                 for (let x = 0; x < BOARD_SIZE; x++) {
@@ -1918,33 +1923,30 @@
                 }
             }
 
-            return {
-                type: 'choose_side',
-                blackStones, whiteStones,
-                blackScore: score.blackScore, whiteScore: score.whiteScore,
-                winner: score.blackScore > score.whiteScore ? 'black' : 'white',
-                desc: '바둑이 끝났어요! 그런데 담이 한 곳 끊겨서, 집처럼 보이는 자리가 사실은 그 누구의 집도 아닌 공배일 수도 있어요. 벽이 온전히 이어져 있는지 확인하면서 집을 세어보세요!'
-            };
+            const problem = scoreAndFinalizeTerritoryProblem(blackStones, whiteStones,
+                '바둑이 끝났어요! 그런데 담이 한 곳 끊겨서, 집처럼 보이는 자리가 사실은 그 누구의 집도 아닌 공배일 수도 있어요. 벽이 온전히 이어져 있는지 확인하면서 집을 세어보세요!');
+            if (!problem) continue;
+            return problem;
         }
         return null;
     }
 
-    // ownerMap(칸별 A/B 소유)으로 돌 배치와 집 개수를 계산한다. territoryKeys를 주면 그
-    // 칸들만 집으로 남기고 나머지 내부 칸은 돌로 채우며(complex 모드), 안 주면 경계가
-    // 아닌 내부 칸 전체가 집이 된다(simple 모드). 활로가 1개뿐(단수)인 돌 무리가 있으면
-    // null을 돌려줘서 그 배치를 버리게 한다.
+    // ownerMap(칸별 A/B 소유)으로 돌 배치를 계산한다. territoryKeys를 주면 그 칸들만 집으로
+    // 남기고 나머지 내부 칸은 돌로 채우며(complex 모드), 안 주면 경계가 아닌 내부 칸 전체가
+    // 집이 된다(simple 모드). 활로가 1개뿐(단수)인 돌 무리가 있으면 null을 돌려줘서 그
+    // 배치를 버리게 한다. 실제 승부 점수는 여기서 매기지 않는다 - A/B 중 어느 쪽이 흑인지
+    // 아직 안 정해졌을 뿐 아니라, "판에 남은 돌 개수"를 점수에 넣는 area 방식은 실제 대국
+    // 계가(집 + 잡은 돌)와 달라서 다른 결과가 나올 수 있다. 진짜 점수는
+    // scoreAndFinalizeTerritoryProblem에서 flood-fill 기반으로 다시 계산한다.
     function buildStonesAndTerritory(ownerMap, territoryKeys) {
         const sideAStones = [], sideBStones = [];
-        let sideATerritory = 0, sideBTerritory = 0;
         for (let y = 0; y < BOARD_SIZE; y++) {
             for (let x = 0; x < BOARD_SIZE; x++) {
                 const k = key(x, y);
                 const mySide = ownerMap[k];
                 const isBoundary = neighbors4(x, y).some(([nx, ny]) => ownerMap[key(nx, ny)] !== mySide);
                 const isTerritory = !isBoundary && (!territoryKeys || territoryKeys.has(k));
-                if (isTerritory) {
-                    if (mySide === 'A') sideATerritory++; else sideBTerritory++;
-                } else {
+                if (!isTerritory) {
                     (mySide === 'A' ? sideAStones : sideBStones).push({ x, y });
                 }
             }
@@ -1984,27 +1986,59 @@
         const minLibsB = minGroupLiberties(sideBStones, sideBKeys);
         if (minLibsA < 2 || minLibsB < 2) return null;
 
+        return { sideAStones, sideBStones };
+    }
+
+    // 두 편의 돌 배치만으로(어느 색인지는 상관없이) 순수 집 차이를 구한다 - genTerritorySimple/
+    // genTerritoryComplex가 "이 정도로 차이 나는 배치가 나왔으면 채택" 판단에만 쓰는 값이라,
+    // 실제 최종 점수(집 + 잡은 돌)와는 별개다.
+    function territoryDiffOf(sideAStones, sideBStones) {
+        const board = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(0));
+        sideAStones.forEach(p => board[p.y][p.x] = 'black');
+        sideBStones.forEach(p => board[p.y][p.x] = 'white');
+        const t = computePlayScore(board);
+        return Math.abs(t.blackTerritory - t.whiteTerritory);
+    }
+
+    // blackStones/whiteStones로 확정된 판을 실제 대국처럼(집 + 잡은 돌) 정확히 채점한다.
+    // 집은 실제 대국 화면과 같은 flood-fill 기반 계가(computePlayScore)로 구하고, 이 예시엔
+    // 실제 대국 기록이 없어 잡은 돌 수는 무작위로 정하되 문제 화면에 숫자로 그대로 보여줘서
+    // 사용자가 판의 집을 세고 거기에 더해 직접 검증할 수 있게 한다.
+    function scoreAndFinalizeTerritoryProblem(blackStones, whiteStones, desc) {
+        const board = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(0));
+        blackStones.forEach(p => board[p.y][p.x] = 'black');
+        whiteStones.forEach(p => board[p.y][p.x] = 'white');
+        const t = computePlayScore(board);
+
+        let capturedByBlack = 0, capturedByWhite = 0, blackScore = 0, whiteScore = 0, settled = false;
+        for (let i = 0; i < 20; i++) {
+            capturedByBlack = randInt(0, 4);
+            capturedByWhite = randInt(0, 4);
+            blackScore = t.blackTerritory + capturedByBlack;
+            whiteScore = t.whiteTerritory + capturedByWhite;
+            if (blackScore !== whiteScore) { settled = true; break; }
+        }
+        if (!settled) return null;
+
+        const winner = blackScore > whiteScore ? 'black' : 'white';
         return {
-            sideAStones, sideBStones,
-            scoreA: sideAStones.length + sideATerritory,
-            scoreB: sideBStones.length + sideBTerritory
+            type: 'choose_side',
+            blackStones, whiteStones,
+            blackTerritory: t.blackTerritory, whiteTerritory: t.whiteTerritory,
+            capturedByBlack, capturedByWhite,
+            blackScore, whiteScore, winner,
+            desc
         };
     }
 
+    // genTerritorySimple/genTerritoryComplex가 만든 {sideAStones, sideBStones}에서 어느 쪽이
+    // 흑인지 무작위로 정한 뒤 scoreAndFinalizeTerritoryProblem으로 넘긴다.
     function finalizeTerritoryProblem(best, desc) {
         if (!best) return null;
         const blackIsA = Math.random() < 0.5;
         const blackStones = blackIsA ? best.sideAStones : best.sideBStones;
         const whiteStones = blackIsA ? best.sideBStones : best.sideAStones;
-        const blackScore = blackIsA ? best.scoreA : best.scoreB;
-        const whiteScore = blackIsA ? best.scoreB : best.scoreA;
-        const winner = blackScore > whiteScore ? 'black' : 'white';
-        return {
-            type: 'choose_side',
-            blackStones, whiteStones,
-            blackScore, whiteScore, winner,
-            desc
-        };
+        return scoreAndFinalizeTerritoryProblem(blackStones, whiteStones, desc);
     }
 
     /* =========================================================
@@ -2622,6 +2656,19 @@
 
         const isChooseSide = currentProblem.type === 'choose_side';
         document.getElementById('choose-side-controls').style.display = isChooseSide ? 'flex' : 'none';
+
+        // 승부 결정하기(Lv.3) 문제는 잡은 돌 수를 숫자로 알려줘서, 판의 집을 세고 여기에
+        // 더하면 스스로 정답을 검증할 수 있게 한다.
+        const capturesInfo = document.getElementById('problem-captures-info');
+        if (isChooseSide && typeof currentProblem.capturedByBlack === 'number') {
+            capturesInfo.style.display = 'flex';
+            capturesInfo.innerHTML = `
+                <span class="cap-row"><span class="mini-stone black"></span>흑이 잡은 돌 ${currentProblem.capturedByBlack}개</span>
+                <span class="cap-row"><span class="mini-stone white"></span>백이 잡은 돌 ${currentProblem.capturedByWhite}개</span>`;
+        } else {
+            capturesInfo.style.display = 'none';
+            capturesInfo.innerHTML = '';
+        }
         document.getElementById('side-btn-black').classList.remove('selected');
         document.getElementById('side-btn-white').classList.remove('selected');
 
