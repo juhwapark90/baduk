@@ -333,6 +333,13 @@
         }
         .learn-mark-x::before { transform: translate(-50%, -50%) rotate(45deg); }
         .learn-mark-x::after { transform: translate(-50%, -50%) rotate(-45deg); }
+        /* 미니퀴즈 슬라이드에서 후보 자리를 "1번/2번"처럼 번호로 짚어줄 때 쓰는 동그란 라벨 */
+        .learn-label-badge {
+            width: 74%; height: 74%; border-radius: 50%; box-sizing: border-box;
+            background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.35), 0 0 0 2px rgba(44,94,67,0.55);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 15px; color: #2c5e43;
+        }
         .learn-caption {
             background: #f1f8f1; border: 2px solid #c3dec3; padding: 12px; border-radius: 8px;
             font-size: 14px; line-height: 1.5; text-align: left; margin-bottom: 12px; color: #333;
@@ -535,9 +542,9 @@
     <div class="container">
         <h2 id="topic-intro-title">주제</h2>
         <p class="subtitle" id="topic-intro-sub"></p>
-        <button class="home-btn" onclick="openLearnSlides()">📖 돌을 잡아먹는 개념 배우기</button>
-        <button class="home-btn" onclick="beginTopicQuiz(currentTopicKey)">✏️ 돌을 잡아먹는 곳은? 퀴즈 풀기</button>
-        <button class="btn btn-back" onclick="goHome()">◀ 주제 목록으로</button>
+        <button class="home-btn" onclick="openLearnSlides()">📖 개념 배우기</button>
+        <button class="home-btn" onclick="startIntroQuiz()">✏️ 퀴즈 풀기</button>
+        <button class="btn btn-back" onclick="backToTopicList()">◀ 주제 목록으로</button>
     </div>
 </div>
 
@@ -2210,6 +2217,59 @@
         }
     ];
 
+    // Lv.5-1 "활로가 적은 돌 찾기" 개념 슬라이드용 실전형 판. 활로 2개짜리 흰 돌 하나(4,5)가
+    // 핵심 - 위쪽(4,4)을 막으면 백돌은 가장자리(4,6) 쪽으로만 도망갈 수 있고, 도망가도 활로가
+    // 2개뿐이며 근처에 같은 편도 없어 잡기 쉽다. 반대로 아래쪽(4,6)을 막으면 백돌은 열린 위쪽
+    // (4,4)으로 도망가 활로 3개+같은 편과 만날 가능성까지 얻는다 - "활로가 적어지는 쪽으로
+    // 몰아야 한다"는 원리를 그대로 보여준다. 모든 무리의 활로 개수를 스크립트로 직접 계산해서
+    // 검증한 뒤 확정한 좌표들이다(0집/자충수 없음, 시나리오별 결과 활로 개수도 실제로 2개/3개).
+    const ATARIATTACK1_BLACK = [{x:3,y:0},{x:4,y:0},{x:2,y:1},{x:5,y:1},{x:3,y:5},{x:5,y:5},{x:5,y:6},{x:7,y:2},{x:7,y:3},{x:1,y:4},{x:1,y:7},{x:2,y:7}];
+    const ATARIATTACK1_WHITE = [{x:3,y:1},{x:4,y:1},{x:5,y:2},{x:4,y:5},{x:0,y:1},{x:0,y:2},{x:0,y:3},{x:0,y:4},{x:8,y:2},{x:8,y:3},{x:7,y:4},{x:1,y:8}];
+    const ATARIATTACK1_LEARN_SLIDES = [
+        {
+            title: '① 활로가 적은 곳으로 공격하자',
+            desc: '이 백돌(⚪)은 활로가 딱 2개예요! 그런데 어느 쪽 활로를 막느냐에 따라 백돌이 도망친 뒤의 활로 개수가 완전히 달라져요. 두 경우를 하나씩 비교해봐요.',
+            blackStones: ATARIATTACK1_BLACK, whiteStones: ATARIATTACK1_WHITE,
+            highlights: [{x:4,y:4},{x:4,y:6}]
+        },
+        {
+            title: '② 1번(위쪽 · 열린 방향)을 막으면?',
+            desc: '1(위쪽)에 흑돌을 두면 백돌은 이제 아래쪽 한 곳으로만 도망갈 수 있어요.',
+            blackStones: [...ATARIATTACK1_BLACK, {x:4,y:4}], whiteStones: ATARIATTACK1_WHITE,
+            lastMove: {x:4,y:4}, highlights: [{x:4,y:6}]
+        },
+        {
+            title: '③ 도망가도 활로가 2개뿐이라 갇혀요',
+            desc: '백돌이 아래로 도망가도 활로가 2개뿐이고, 바둑판 끝에 갇혀서 도와줄 같은 편도 없어요. 잡아먹기 훨씬 쉬워졌어요!',
+            blackStones: [...ATARIATTACK1_BLACK, {x:4,y:4}], whiteStones: [...ATARIATTACK1_WHITE, {x:4,y:6}],
+            lastMove: {x:4,y:6}, highlights: [{x:3,y:6},{x:4,y:7}]
+        },
+        {
+            title: '④ 반대로 2번(아래쪽 · 가장자리)을 막으면?',
+            desc: '2(아래쪽)에 흑돌을 두면 백돌은 위쪽 넓은 곳으로 도망갈 수 있어요.',
+            blackStones: [...ATARIATTACK1_BLACK, {x:4,y:6}], whiteStones: ATARIATTACK1_WHITE,
+            lastMove: {x:4,y:6}, highlights: [{x:4,y:4}]
+        },
+        {
+            title: '⑤ 활로가 3개나 남고 같은 편도 만나요',
+            desc: '백돌이 위로 도망가면 활로가 3개나 남고, 저 위에 있는 같은 편 백돌과 만날 가능성도 커져요. 이건 좋은 공격이 아니에요.',
+            blackStones: [...ATARIATTACK1_BLACK, {x:4,y:6}], whiteStones: [...ATARIATTACK1_WHITE, {x:4,y:4}],
+            lastMove: {x:4,y:4}, highlights: [{x:3,y:4},{x:5,y:4},{x:4,y:3}]
+        },
+        {
+            title: '미니퀴즈!!! 🎯',
+            desc: '백돌을 잡아먹기 위해 1, 2 두 가지 경우로 단수를 할 수 있어요. 어디에 두는 게 좋을까요?',
+            blackStones: ATARIATTACK1_BLACK, whiteStones: ATARIATTACK1_WHITE,
+            labels: [{x:4,y:4,text:'1'},{x:4,y:6,text:'2'}]
+        },
+        {
+            title: '정답은 1번이에요! ✅',
+            desc: '정답은 1번! 백돌을 활로가 더 적어지는 쪽(가장자리)으로 몰아야 잡기 쉬워져요. 이제 진짜 퀴즈로 연습해봐요!',
+            blackStones: [...ATARIATTACK1_BLACK, {x:4,y:4}], whiteStones: ATARIATTACK1_WHITE,
+            lastMove: {x:4,y:4}
+        }
+    ];
+
     const TOPICS = [
         { key: 'catchbasics', title: '[Lv. 1] 돌 잡아먹기', sub: '단수된 돌을 잡는 원리를 배우고 연습해요',
           learnSlides: CATCH_LEARN_SLIDES,
@@ -2253,7 +2313,7 @@
         // 기존 단수(genAtari) 문제 생성기를 그대로 재사용한 임시 구성이다 - 나중에 내용을 다듬는다.
         { key: 'atariattack', title: '[Lv. 5] 활로가 적은 곳으로 공격하자', sub: '활로가 적은 상대 돌을 찾아 먼저 공격해요',
           subLevels: [
-              { key: 'atariattack1', title: '5-1. 활로가 적은 돌 찾기', tiers: [() => genAtari(1)], counts: [5] },
+              { key: 'atariattack1', title: '5-1. 활로가 적은 돌 찾기', learnSlides: ATARIATTACK1_LEARN_SLIDES, tiers: [() => genAtari(1)], counts: [5] },
               { key: 'atariattack2', title: '5-2. 여러 개로 이어진 돌 공격하기', tiers: [() => genAtari(2)], counts: [5] },
               { key: 'atariattack3', title: '5-3. 구석에 있는 돌 공격하기', tiers: [
                   () => {
@@ -2393,6 +2453,7 @@
         if (topic.disabled) { alert('아직 준비 중이에요! 조금만 기다려주세요 🙏'); return; }
         if (!isTopicUnlocked(idx, character)) { alert('이전 레벨을 먼저 클리어해야 열려요!'); return; }
         currentTopicKey = topicKey;
+        currentSubLevelKey = null;
         if (topic.subLevels) {
             openSubLevelSelect(topicKey);
         } else if (topic.learnSlides) {
@@ -2401,6 +2462,16 @@
             switchScreen('screen-topic-intro');
         } else {
             beginTopicQuiz(topicKey);
+        }
+    }
+
+    // screen-topic-intro의 "퀴즈 풀기" 버튼용 - 일반 주제(Lv.1~3 등)면 그 주제 퀴즈를,
+    // 세부 항목(Lv.5의 5-1 등) 소개 화면에서 왔으면 그 세부 항목 퀴즈를 시작한다.
+    function startIntroQuiz() {
+        if (currentSubLevelKey) {
+            beginSubLevelQuiz(currentTopicKey, currentSubLevelKey);
+        } else {
+            beginTopicQuiz(currentTopicKey);
         }
     }
 
@@ -2446,9 +2517,24 @@
                 </div>
                 <span class="desc-line">${cleared ? `클리어 완료 (+${SUBLEVEL_POINTS}점)` : `클리어하면 ${SUBLEVEL_POINTS}점 획득 · 문제 ${(sl.counts || []).reduce((a,b)=>a+b,0)}개`}</span>
             `;
-            btn.onclick = () => beginSubLevelQuiz(topic.key, sl.key);
+            btn.onclick = () => {
+                if (sl.learnSlides) { openSubLevelIntro(topic.key, sl.key); }
+                else { beginSubLevelQuiz(topic.key, sl.key); }
+            };
             list.appendChild(btn);
         });
+    }
+
+    // 세부 항목에 개념 배우기 슬라이드가 있으면(예: 5-1) 곧바로 퀴즈로 들어가지 않고
+    // 일반 주제와 같은 소개 화면(개념 배우기 / 퀴즈 풀기 선택)을 먼저 보여준다.
+    function openSubLevelIntro(topicKey, subKey) {
+        currentTopicKey = topicKey;
+        currentSubLevelKey = subKey;
+        const topic = TOPICS.find(t => t.key === topicKey);
+        const sub = topic.subLevels.find(s => s.key === subKey);
+        document.getElementById('topic-intro-title').innerText = sub.title;
+        document.getElementById('topic-intro-sub').innerText = topic.sub;
+        switchScreen('screen-topic-intro');
     }
 
     function beginSubLevelQuiz(topicKey, subKey) {
@@ -2517,7 +2603,8 @@
 
     function openLearnSlides() {
         const topic = TOPICS.find(t => t.key === currentTopicKey);
-        currentLearnSlides = topic.learnSlides;
+        const sub = (currentSubLevelKey && topic.subLevels) ? topic.subLevels.find(s => s.key === currentSubLevelKey) : null;
+        currentLearnSlides = sub ? sub.learnSlides : topic.learnSlides;
         currentLearnIdx = 0;
         renderLearnSlide();
         switchScreen('screen-learn');
@@ -2560,6 +2647,7 @@
         slide.whiteStones.forEach(p => place(p.x, p.y, `<div class="stone white${isLastMove(p) ? ' last-move' : ''}"></div>`));
         (slide.highlights || []).forEach(p => place(p.x, p.y, learnArrowHtml(learnHighlightDirection(slide, p))));
         (slide.xmarks || []).forEach(p => place(p.x, p.y, '<div class="learn-mark-x"></div>'));
+        (slide.labels || []).forEach(p => place(p.x, p.y, `<div class="learn-label-badge">${p.text}</div>`));
 
         document.getElementById('learn-title').innerText = slide.title;
         document.getElementById('learn-caption').innerText = slide.desc;
@@ -2578,7 +2666,7 @@
             currentLearnIdx++;
             renderLearnSlide();
         } else {
-            beginTopicQuiz(currentTopicKey);
+            startIntroQuiz();
         }
     }
 
