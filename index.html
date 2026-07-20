@@ -319,12 +319,17 @@
         }
         .learn-grid { position: absolute; top: 10%; left: 10%; width: 80%; height: 80%; }
         /* 활로 방향 화살표 - 흰 원판 위에 굵고 진한 빨간 화살표를 얹어서 나무 판 위에서도 눈에 잘 띄게 한다 */
+        /* 활로 화살표는 흰 바탕 없이 투명 배경 위에 빨간 화살표만 보이게 한다 - 흰 바탕이
+           백돌과 헷갈린다는 피드백을 반영. */
         .learn-arrow-wrap {
             width: 78%; height: 78%; border-radius: 50%; box-sizing: border-box;
-            background: rgba(255,255,255,0.92); box-shadow: 0 1px 3px rgba(0,0,0,0.35), 0 0 0 2px rgba(211,47,47,0.35);
+            background: transparent;
             display: flex; align-items: center; justify-content: center;
         }
-        .learn-arrow-icon { width: 68%; height: 68%; color: #d32f2f; }
+        .learn-arrow-icon {
+            width: 68%; height: 68%; color: #d32f2f;
+            filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 2px #fff);
+        }
         .learn-arrow-up { transform: rotate(0deg); }
         .learn-arrow-down { transform: rotate(180deg); }
         .learn-arrow-left { transform: rotate(-90deg); }
@@ -2360,93 +2365,105 @@
         }
     ];
 
-    // Lv.5-3 "역습을 조심하자" 개념 슬라이드용 판. 흑돌(4,4)과 백돌(6,4)이 각각 활로 2개뿐인
-    // 약한 돌이고, 공교롭게도 (5,4) 한 점을 공유한다(둘 다의 활로). 안전 확인 없이 바로 백돌을
-    // 단수치면(6,3) 백돌이 그 공유 지점(5,4)으로 도망가면서 거꾸로 흑돌이 단수에 걸린다 -
-    // 공격은커녕 방어부터 해야 하는 상황. 반대로 먼저 흑돌을 보강(4,5)해두면, 같은 공격을 해도
-    // 백돌이 도망가도 흑돌은 끄떡없다. 두 시나리오 모두 스크립트로 매 수 활로를 계산해 검증했다
-    // (0집/자충수 없음, "역습" 결과 실제로 활로 0=단수가 됨을 확인).
-    const ATARIATTACK3_WHITE_WALL = [{x:4,y:3},{x:3,y:4}]; // 흑돌 활로를 2개로 제한하는 백돌 벽
-    const ATARIATTACK3_BLACK_WALL = [{x:7,y:4},{x:6,y:5}]; // 백돌(목표) 활로를 2개로 제한하는 흑돌 벽
-    const ATARIATTACK3_BLACK_ATTACKER = {x:4,y:4};
-    const ATARIATTACK3_WHITE_TARGET = {x:6,y:4};
+    // Lv.5-3 "역습을 조심하자" 개념 슬라이드용 판. 서로 독립된 두 예시를 비교한다 - 둘 다
+    // "흑돌이 백돌을 단수치고, 백돌이 유일한 활로로 도망간다"는 같은 동작이지만 결과가 다르다.
+    // 예시A: 흑돌 활로가 2개뿐이고 그중 하나가 백돌의 도망갈 자리와 겹쳐서, 백돌이 도망가면
+    // 거꾸로 흑돌이 단수에 걸린다(역습). 예시B: 흑돌 활로가 3개라서(벽이 한쪽만 있음) 백돌이
+    // 똑같이 도망가도 흑돌은 활로가 남아 안전하다. 즉 "미리 보강하는 기술"이 아니라 "이 모양이
+    // 위험한지 안전한지 미리 알아보는 눈"을 기르는 게 목표다. 세 시나리오(A/B/퀴즈) 모두
+    // 스크립트로 매 수 활로를 계산해 검증했다(0집/자충수 없음, 결과 활로 개수도 실제와 일치).
+    const ATARIATTACK3_A_WHITE_WALL = [{x:4,y:3},{x:3,y:4}]; // 흑돌 활로를 2개로 제한(양쪽 벽)
+    const ATARIATTACK3_A_BLACK_WALL = [{x:7,y:4},{x:6,y:5}]; // 백돌(목표) 활로를 2개로 제한
+    const ATARIATTACK3_A_BLACK_ATTACKER = {x:4,y:4};
+    const ATARIATTACK3_A_WHITE_TARGET = {x:6,y:4};
+
+    const ATARIATTACK3_B_WHITE_WALL = [{x:4,y:3}]; // 벽이 한쪽뿐이라 흑돌 활로가 3개
+    const ATARIATTACK3_B_BLACK_WALL = [{x:7,y:4},{x:6,y:5}];
+    const ATARIATTACK3_B_BLACK_ATTACKER = {x:4,y:4};
+    const ATARIATTACK3_B_WHITE_TARGET = {x:6,y:4};
+
+    const ATARIATTACK3_Q_WHITE_WALL = [{x:1,y:2},{x:2,y:1}]; // 흑돌 활로를 2개로 제한(퀴즈용, 위험한 모양)
+    const ATARIATTACK3_Q_BLACK_WALL = [{x:5,y:2},{x:4,y:1}];
+    const ATARIATTACK3_Q_BLACK_ATTACKER = {x:2,y:2};
+    const ATARIATTACK3_Q_WHITE_TARGET = {x:4,y:2};
+
     const ATARIATTACK3_LEARN_SLIDES = [
         {
-            title: '① 이 흑돌, 활로가 2개뿐이에요',
-            desc: '공격하기 전에 먼저 내 돌부터 살펴봐요. 이 흑돌(공격할 돌)은 활로가 딱 2개뿐이에요.',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET],
-            highlights: [{x:5,y:4},{x:4,y:5}]
+            title: '① 위험한 예시 - 활로를 확인해봐요',
+            desc: '이 흑돌(공격할 돌)은 활로가 2개, 저 백돌은 활로가 2개예요. 그런데 활로 하나가 겹쳐 있어요(공통 지점)!',
+            blackStones: [...ATARIATTACK3_A_BLACK_WALL, ATARIATTACK3_A_BLACK_ATTACKER],
+            whiteStones: [...ATARIATTACK3_A_WHITE_WALL, ATARIATTACK3_A_WHITE_TARGET],
+            highlights: [{x:5,y:4},{x:4,y:5},{x:6,y:3}]
         },
         {
-            title: '② 저 백돌도 활로가 2개예요',
-            desc: '저 백돌도 활로가 2개뿐이라 단수치기 딱 좋아 보여요. 그런데 신중하게 살펴봐야 해요 - 활로 하나가 겹쳐 있어요!',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET],
-            highlights: [{x:5,y:4},{x:6,y:3}]
-        },
-        {
-            title: '③ 안전 확인 없이 바로 공격하면?',
-            desc: '내 돌은 안 살펴보고 바로 백돌을 단수쳤어요.',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER, {x:6,y:3}],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET],
+            title: '② 백돌을 단수쳤어요',
+            desc: '겹치지 않은 쪽을 막아서 백돌을 단수쳤어요.',
+            blackStones: [...ATARIATTACK3_A_BLACK_WALL, ATARIATTACK3_A_BLACK_ATTACKER, {x:6,y:3}],
+            whiteStones: [...ATARIATTACK3_A_WHITE_WALL, ATARIATTACK3_A_WHITE_TARGET],
             lastMove: {x:6,y:3}, highlights: [{x:5,y:4}]
         },
         {
-            title: '④ 백돌이 도망가면서 오히려 내가 단수!',
-            desc: '백돌이 유일한 활로로 도망갔어요. 그런데 그 자리가 하필 내 흑돌의 활로이기도 했어요! 이제 내 흑돌이 단수예요.',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER, {x:6,y:3}],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET, {x:5,y:4}],
-            lastMove: {x:5,y:4}, highlights: [{x:4,y:5}]
+            title: '③ 백돌이 유일한 활로로 도망갔어요',
+            desc: '백돌이 마지막 활로로 도망갔어요. 그런데 그 자리가 하필 내 흑돌의 활로이기도 했어요!',
+            blackStones: [...ATARIATTACK3_A_BLACK_WALL, ATARIATTACK3_A_BLACK_ATTACKER, {x:6,y:3}],
+            whiteStones: [...ATARIATTACK3_A_WHITE_WALL, ATARIATTACK3_A_WHITE_TARGET, {x:5,y:4}],
+            lastMove: {x:5,y:4}
         },
         {
-            title: '⑤ 공격은커녕 방어부터 해야 해요',
-            desc: '이렇게 되면 백돌을 계속 공격하기는커녕, 내 흑돌부터 살려야 해요. 무리하게 공격한 대가예요!',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER, {x:6,y:3}, {x:4,y:5}],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET, {x:5,y:4}],
-            lastMove: {x:4,y:5}
-        },
-        {
-            title: '⑥ 그럼 어떻게 안전하게 공격할까요?',
-            desc: '정답은 간단해요 - 공격하기 전에 활로가 적은 내 돌부터 미리 보강해두면 돼요!',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET],
+            title: '④ 어라, 내 흑돌도 단수예요!',
+            desc: '백돌은 잡지도 못했는데 오히려 내 흑돌이 단수에 걸렸어요. 활로가 겹치는 걸 못 봐서 생긴 역습이에요.',
+            blackStones: [...ATARIATTACK3_A_BLACK_WALL, ATARIATTACK3_A_BLACK_ATTACKER, {x:6,y:3}],
+            whiteStones: [...ATARIATTACK3_A_WHITE_WALL, ATARIATTACK3_A_WHITE_TARGET, {x:5,y:4}],
             highlights: [{x:4,y:5}]
         },
         {
-            title: '⑦ 먼저 내 돌을 튼튼하게 만들어요',
-            desc: '공격하기 전에 먼저 이어서 내 돌을 튼튼하게 만들었어요. 이제 활로가 4개나 돼요!',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER, {x:4,y:5}],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET],
-            lastMove: {x:4,y:5}
+            title: '⑤ 안전한 예시 - 다른 상황을 볼까요?',
+            desc: '이번엔 다른 판이에요. 흑돌 활로가 3개, 백돌 활로가 2개고, 역시 활로 하나가 겹쳐 있어요.',
+            blackStones: [...ATARIATTACK3_B_BLACK_WALL, ATARIATTACK3_B_BLACK_ATTACKER],
+            whiteStones: [...ATARIATTACK3_B_WHITE_WALL, ATARIATTACK3_B_WHITE_TARGET],
+            highlights: [{x:3,y:4},{x:5,y:4},{x:4,y:5},{x:6,y:3}]
         },
         {
-            title: '⑧ 이제 안심하고 공격해요',
-            desc: '이제 안전하니까 백돌을 단수쳐요!',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER, {x:4,y:5}, {x:6,y:3}],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET],
+            title: '⑥ 이번에도 똑같이 백돌을 단수쳐요',
+            desc: '아까와 똑같은 방식으로 백돌을 단수쳐요.',
+            blackStones: [...ATARIATTACK3_B_BLACK_WALL, ATARIATTACK3_B_BLACK_ATTACKER, {x:6,y:3}],
+            whiteStones: [...ATARIATTACK3_B_WHITE_WALL, ATARIATTACK3_B_WHITE_TARGET],
             lastMove: {x:6,y:3}, highlights: [{x:5,y:4}]
         },
         {
-            title: '⑨ 백돌이 도망가도 나는 끄떡없어요',
-            desc: '백돌이 똑같이 도망가도, 이번엔 내 흑돌이 단수에 걸리지 않아요! 여전히 활로가 넉넉해서 안전해요.',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER, {x:4,y:5}, {x:6,y:3}],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET, {x:5,y:4}],
-            lastMove: {x:5,y:4}, highlights: [{x:3,y:5},{x:4,y:6}]
+            title: '⑦ 백돌이 똑같이 도망갔어요',
+            desc: '백돌이 아까와 똑같은 자리로 도망갔어요.',
+            blackStones: [...ATARIATTACK3_B_BLACK_WALL, ATARIATTACK3_B_BLACK_ATTACKER, {x:6,y:3}],
+            whiteStones: [...ATARIATTACK3_B_WHITE_WALL, ATARIATTACK3_B_WHITE_TARGET, {x:5,y:4}],
+            lastMove: {x:5,y:4}
+        },
+        {
+            title: '⑧ 이번엔 내 흑돌이 끄떡없어요!',
+            desc: '이번엔 흑돌 활로가 원래 3개였어서, 겹치는 자리를 백돌에게 내줘도 여전히 활로가 2개 남아요. 안전해요!',
+            blackStones: [...ATARIATTACK3_B_BLACK_WALL, ATARIATTACK3_B_BLACK_ATTACKER, {x:6,y:3}],
+            whiteStones: [...ATARIATTACK3_B_WHITE_WALL, ATARIATTACK3_B_WHITE_TARGET, {x:5,y:4}],
+            highlights: [{x:3,y:4},{x:4,y:5}]
+        },
+        {
+            title: '⑨ 무엇이 달랐을까요?',
+            desc: '두 예시 모두 "백돌을 단수치고 백돌이 도망간" 건 똑같아요. 차이는 내 흑돌의 활로 개수였어요! 활로가 2개뿐이면 역습당하고, 3개 이상이면 안전해요. 공격하기 전에 꼭 확인하세요.',
+            blackStones: [...ATARIATTACK3_A_BLACK_WALL, ATARIATTACK3_A_BLACK_ATTACKER, {x:6,y:3}],
+            whiteStones: [...ATARIATTACK3_A_WHITE_WALL, ATARIATTACK3_A_WHITE_TARGET, {x:5,y:4}],
+            xmarks: [{x:4,y:4}]
         },
         {
             title: '미니퀴즈!!! 🎯',
-            desc: '지금 백돌을 단수치면 위험해요. 안전하게 공격하려면 1번, 2번 중 어디에 먼저 둬야 할까요?',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET],
-            labels: [{x:4,y:5,text:'1'},{x:6,y:3,text:'2'}]
+            desc: '이 흑돌로 물음표(?) 자리를 공격해서 백돌을 단수치면, 내 흑돌은 안전할까요 위험할까요?',
+            blackStones: [...ATARIATTACK3_Q_BLACK_WALL, ATARIATTACK3_Q_BLACK_ATTACKER],
+            whiteStones: [...ATARIATTACK3_Q_WHITE_WALL, ATARIATTACK3_Q_WHITE_TARGET],
+            labels: [{x:4,y:3,text:'?'}]
         },
         {
-            title: '정답은 1번이에요! ✅',
-            desc: '정답은 1번! 공격하기 전에 활로가 적은 내 돌부터 먼저 보강해야, 상대가 도망가도 역습당하지 않아요.',
-            blackStones: [...ATARIATTACK3_BLACK_WALL, ATARIATTACK3_BLACK_ATTACKER, {x:4,y:5}],
-            whiteStones: [...ATARIATTACK3_WHITE_WALL, ATARIATTACK3_WHITE_TARGET],
-            lastMove: {x:4,y:5}
+            title: '정답은 "위험해요"예요! ⚠️',
+            desc: '백돌이 도망간 자리가 하필 내 흑돌의 활로여서, 흑돌도 단수에 걸려요. 이렇게 활로가 겹치는 모양을 미리 알아보는 게 이번 개념의 핵심이에요!',
+            blackStones: [...ATARIATTACK3_Q_BLACK_WALL, ATARIATTACK3_Q_BLACK_ATTACKER, {x:4,y:3}],
+            whiteStones: [...ATARIATTACK3_Q_WHITE_WALL, ATARIATTACK3_Q_WHITE_TARGET, {x:3,y:2}],
+            lastMove: {x:3,y:2}, highlights: [{x:2,y:3}]
         }
     ];
 
