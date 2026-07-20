@@ -340,6 +340,19 @@
             display: flex; align-items: center; justify-content: center;
             font-weight: 900; font-size: 15px; color: #2c5e43;
         }
+        /* 슬라이드가 넘어갈 때 "방금 둔 수/방금 잡힘/미니퀴즈 번호"가 톡 튀어나오듯 나타나는 효과 -
+           여러 수를 이어서 보여주는 5-2 같은 슬라이드에서 진행 상황이 한눈에 눈에 띄도록 한다.
+           실제 대국판(.stone.last-move)에는 영향 없게 .learn-grid 안에서만 적용한다. */
+        @keyframes learnPopIn {
+            0% { transform: scale(0.25); opacity: 0; }
+            65% { transform: scale(1.18); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .learn-grid .stone.last-move,
+        .learn-grid .learn-mark-x,
+        .learn-grid .learn-label-badge {
+            animation: learnPopIn 0.45s ease-out;
+        }
         .learn-caption {
             background: #f1f8f1; border: 2px solid #c3dec3; padding: 12px; border-radius: 8px;
             font-size: 14px; line-height: 1.5; text-align: left; margin-bottom: 12px; color: #333;
@@ -2270,6 +2283,82 @@
         }
     ];
 
+    // Lv.5-2 "구석으로 몰자" 개념 슬라이드용 판. 활로 2개짜리 흰 돌 하나(3,4)를 계속 활로가
+    // 적어지는 쪽(왼쪽 가장자리)으로 몰아가면 결국 잡히고(성공 예시, 5수 만에 포획), 반대로
+    // 열린 쪽이 아니라 가장자리 쪽을 먼저 막아버리면 백돌이 오히려 넓은 쪽으로 도망가 활로가
+    // 2개->3개로 늘어나며 살아남는다(실패 예시) - 두 시나리오 모두 스크립트로 매 수마다 활로를
+    // 직접 계산해서 검증했다(0집/자충수 없음, 성공 예시는 실제로 활로 0이 되어 포획됨).
+    const ATARIATTACK2_BASE_BLACK = [{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:1,y:5},{x:3,y:5}];
+    const ATARIATTACK2_WHITE_START = {x:3,y:4};
+    const ATARIATTACK2_LEARN_SLIDES = [
+        {
+            title: '① 활로가 적은 쪽으로 계속 몰아봐요',
+            desc: '이 백돌은 활로가 2개예요. 한 번만 막고 끝나는 게 아니라, 계속 활로가 적어지는 쪽으로 몰아가면 결국 가장자리나 구석에 갇혀서 잡을 수 있어요!',
+            blackStones: ATARIATTACK2_BASE_BLACK, whiteStones: [ATARIATTACK2_WHITE_START],
+            highlights: [{x:2,y:4},{x:4,y:4}]
+        },
+        {
+            title: '② 오른쪽(열린 쪽)을 막았어요',
+            desc: '오른쪽(열린 쪽)을 막으면 백돌은 왼쪽(가장자리 쪽)으로만 도망갈 수 있어요.',
+            blackStones: [...ATARIATTACK2_BASE_BLACK, {x:4,y:4}], whiteStones: [ATARIATTACK2_WHITE_START],
+            lastMove: {x:4,y:4}, highlights: [{x:2,y:4}]
+        },
+        {
+            title: '③ 백돌이 왼쪽으로 도망갔어요',
+            desc: '백돌이 왼쪽으로 도망갔어요. 그런데 아직 안심하긴 일러요 - 아래쪽 담이 살짝 비어있는 게 보이나요?',
+            blackStones: [...ATARIATTACK2_BASE_BLACK, {x:4,y:4}], whiteStones: [ATARIATTACK2_WHITE_START, {x:2,y:4}],
+            lastMove: {x:2,y:4}, highlights: [{x:1,y:4},{x:2,y:5}]
+        },
+        {
+            title: '④ 비어있던 담을 마저 막아요',
+            desc: '아래쪽 빈틈을 마저 막았어요! 이제 백돌은 왼쪽 한 곳으로만 도망갈 수 있어요.',
+            blackStones: [...ATARIATTACK2_BASE_BLACK, {x:4,y:4}, {x:2,y:5}], whiteStones: [ATARIATTACK2_WHITE_START, {x:2,y:4}],
+            lastMove: {x:2,y:5}, highlights: [{x:1,y:4}]
+        },
+        {
+            title: '⑤ 가장자리 바로 앞까지 몰렸어요',
+            desc: '백돌이 가장자리 바로 앞까지 도망갔어요. 활로가 딱 1개(왼쪽)만 남았어요!',
+            blackStones: [...ATARIATTACK2_BASE_BLACK, {x:4,y:4}, {x:2,y:5}], whiteStones: [ATARIATTACK2_WHITE_START, {x:2,y:4}, {x:1,y:4}],
+            lastMove: {x:1,y:4}, highlights: [{x:0,y:4}]
+        },
+        {
+            title: '⑥ 마지막 활로까지 막으면 잡혀요!',
+            desc: '가장자리(끝선)까지 마지막 활로를 막으면 백돌은 더 이상 도망갈 곳이 없어서 통째로 잡혀요! 이렇게 활로가 적어지는 쪽(가장자리·구석)으로 계속 몰아가는 게 핵심이에요.',
+            blackStones: [...ATARIATTACK2_BASE_BLACK, {x:4,y:4}, {x:2,y:5}, {x:0,y:4}], whiteStones: [],
+            lastMove: {x:0,y:4}, xmarks: [ATARIATTACK2_WHITE_START, {x:2,y:4}, {x:1,y:4}]
+        },
+        {
+            title: '⑦ 그런데 반대로 몰면 어떻게 될까요?',
+            desc: '이번엔 똑같은 자리에서 다시 시작해요. 활로가 적어지는 쪽이 아니라 반대로 열린 쪽 대신 가장자리 쪽을 막으면 어떻게 될까요?',
+            blackStones: ATARIATTACK2_BASE_BLACK, whiteStones: [ATARIATTACK2_WHITE_START],
+            highlights: [{x:2,y:4},{x:4,y:4}]
+        },
+        {
+            title: '⑧ 이번엔 가장자리 쪽을 막았어요',
+            desc: '가장자리 쪽을 먼저 막아버리면, 백돌은 오히려 넓게 열린 오른쪽으로 도망갈 수 있어요.',
+            blackStones: [...ATARIATTACK2_BASE_BLACK, {x:2,y:4}], whiteStones: [ATARIATTACK2_WHITE_START],
+            lastMove: {x:2,y:4}, highlights: [{x:4,y:4}]
+        },
+        {
+            title: '⑨ 백돌이 열린 곳으로 도망갔어요',
+            desc: '백돌이 넓은 쪽으로 도망가니까 활로가 2개에서 3개로 오히려 늘어났어요! 이제 몰아서 잡기 훨씬 어려워졌어요.',
+            blackStones: [...ATARIATTACK2_BASE_BLACK, {x:2,y:4}], whiteStones: [ATARIATTACK2_WHITE_START, {x:4,y:4}],
+            lastMove: {x:4,y:4}, highlights: [{x:4,y:3},{x:5,y:4},{x:4,y:5}]
+        },
+        {
+            title: '미니퀴즈!!! 🎯',
+            desc: '백돌을 구석/가장자리로 몰아서 잡으려고 해요. 1과 2 중 어느 쪽을 먼저 막아야 할까요?',
+            blackStones: ATARIATTACK2_BASE_BLACK, whiteStones: [ATARIATTACK2_WHITE_START],
+            labels: [{x:4,y:4,text:'1'},{x:2,y:4,text:'2'}]
+        },
+        {
+            title: '정답은 1번이에요! ✅',
+            desc: '정답은 1번(오른쪽, 열린 쪽)! 열린 쪽을 막아야 백돌이 활로가 적어지는 가장자리 쪽으로 도망가고, 계속 그렇게 몰면 결국 구석에서 잡혀요.',
+            blackStones: [...ATARIATTACK2_BASE_BLACK, {x:4,y:4}], whiteStones: [ATARIATTACK2_WHITE_START],
+            lastMove: {x:4,y:4}
+        }
+    ];
+
     const TOPICS = [
         { key: 'catchbasics', title: '[Lv. 1] 돌 잡아먹기', sub: '단수된 돌을 잡는 원리를 배우고 연습해요',
           learnSlides: CATCH_LEARN_SLIDES,
@@ -2314,7 +2403,7 @@
         { key: 'atariattack', title: '[Lv. 5] 활로가 적은 곳으로 공격하자', sub: '활로가 적은 상대 돌을 찾아 먼저 공격해요',
           subLevels: [
               { key: 'atariattack1', title: '5-1. 활로가 적은 돌 찾기', learnSlides: ATARIATTACK1_LEARN_SLIDES, tiers: [() => genAtari(1)], counts: [5] },
-              { key: 'atariattack2', title: '5-2. 여러 개로 이어진 돌 공격하기', tiers: [() => genAtari(2)], counts: [5] },
+              { key: 'atariattack2', title: '5-2. 구석으로 몰자', learnSlides: ATARIATTACK2_LEARN_SLIDES, tiers: [() => genAtari(2)], counts: [5] },
               { key: 'atariattack3', title: '5-3. 구석에 있는 돌 공격하기', tiers: [
                   () => {
                       const r = makeGroupWithLiberties(1, 2, randomCornerRegion());
