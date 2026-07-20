@@ -153,20 +153,22 @@
         .topic-progress-text { display: block; font-size: 10px; font-weight: normal; opacity: 0.9; margin-top: 3px; }
         .topic-btn.locked { filter: grayscale(0.6); opacity: 0.6; }
 
-        /* 캐릭터 헤더 (메인화면 상단 고정) */
+        /* 캐릭터 헤더 (메인화면 상단 고정) - 캐릭터모양/이름/레벨/포인트를 세로로 가운데 정렬해서 쌓는다.
+           캐릭터 전환·상점 버튼은 햄버거 메뉴로 옮겨서 여기선 없앴고, 대신 포인트를 누르면 상점으로 간다. */
         .character-header {
-            display: none; align-items: center; gap: 10px; width: 100%;
+            display: none; flex-direction: column; align-items: center; text-align: center; gap: 4px;
+            width: 100%;
             background: linear-gradient(135deg, #2c5e43, #3f7d5c); color: white;
-            border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; box-sizing: border-box;
+            border-radius: 14px; padding: 16px 12px; margin-bottom: 14px; box-sizing: border-box;
         }
         .ch-info { flex: 1; text-align: left; }
-        .ch-name-row { font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+        .ch-name-row { font-size: 15px; font-weight: bold; }
         .ch-points-row { font-size: 12px; opacity: 0.9; margin-top: 2px; }
-        .ch-icon-btn {
-            background: rgba(255,255,255,0.2); border: none; border-radius: 8px; color: white;
-            font-size: 16px; padding: 6px 9px; cursor: pointer;
+        .ch-points-btn {
+            background: rgba(255,255,255,0.22); border: none; border-radius: 999px; color: white;
+            font-size: 13px; font-weight: bold; padding: 4px 16px; margin-top: 2px; cursor: pointer;
         }
-        .ch-icon-btn:hover { background: rgba(255,255,255,0.35); }
+        .ch-points-btn:hover, .ch-points-btn:active { background: rgba(255,255,255,0.4); }
 
         /* 아바타: Dicebear adventurer 스타일 SVG를 옵션 조합으로 그린다.
            고정 좌표계의 벡터라 텍스트 이모지처럼 기기마다 위치/모양이 흔들리는 문제가 없고,
@@ -1210,13 +1212,10 @@
         header.style.display = 'flex';
         const level = characterLevel(character);
         header.innerHTML = `
-            ${avatarHtml(character, 40)}
-            <div class="ch-info">
-                <div class="ch-name-row">${character.name} ${charLevelBadgeHtml(level)}</div>
-                <div class="ch-points-row">💰 ${walletBalance(character)}P</div>
-            </div>
-            <button class="ch-icon-btn" onclick="openCharacterSelect()" title="캐릭터 전환">🔀</button>
-            <button class="ch-icon-btn" onclick="openShop()" title="상점">🛍️</button>
+            ${avatarHtml(character, 56)}
+            <div class="ch-name-row">${character.name}</div>
+            ${charLevelBadgeHtml(level)}
+            <button class="ch-points-btn" onclick="openShop()" title="상점으로 이동">💰 ${walletBalance(character)}P</button>
         `;
     }
 
