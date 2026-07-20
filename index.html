@@ -47,11 +47,60 @@
             align-items: center;
             background-color: #e6f0e6;
             margin: 0;
-            padding: 20px;
+            padding: 72px 20px 20px;
         }
 
         .screen { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 500px; }
         .screen.active { display: flex; }
+
+        /* 상단 고정 내비게이션 바 (모든 화면 공통) */
+        .top-nav-bar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 500; box-sizing: border-box;
+            height: 52px; background: linear-gradient(135deg, #2c5e43, #3f7d5c);
+            display: flex; align-items: center; padding: 0 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+        }
+        .tnb-icon-btn {
+            background: none; border: none; color: #fff; width: 40px; height: 40px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+            border-radius: 50%;
+        }
+        .tnb-icon-btn:active { background: rgba(255,255,255,0.18); }
+        .tnb-icon-btn svg { width: 22px; height: 22px; }
+        .tnb-center {
+            flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 7px;
+            color: #fff; font-weight: 900; font-size: 15px; letter-spacing: 0.02em;
+        }
+        .tnb-brand { white-space: nowrap; }
+        .tnb-stone { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+        .tnb-stone-black { background: radial-gradient(circle at 35% 30%, #6b6b6b, #0c0c0c 72%); }
+        .tnb-stone-white { background: radial-gradient(circle at 35% 30%, #ffffff, #cfcfcf 72%); }
+        .tnb-profile-btn { overflow: hidden; background: rgba(255,255,255,0.15); }
+        .tnb-profile-btn img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .tnb-profile-btn svg { width: 24px; height: 24px; }
+
+        /* 햄버거 메뉴 서랍 */
+        .top-menu-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 600;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .top-menu-overlay.open { opacity: 1; pointer-events: auto; }
+        .top-menu-drawer {
+            position: fixed; top: 0; left: 0; bottom: 0; width: 240px; max-width: 78vw; z-index: 601;
+            background: #ffffff; box-shadow: 3px 0 12px rgba(0,0,0,0.2);
+            transform: translateX(-100%); transition: transform 0.22s ease;
+            padding: 62px 14px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px;
+            overflow-y: auto;
+        }
+        .top-menu-drawer.open { transform: translateX(0); }
+        .tmd-title { font-size: 13px; font-weight: bold; color: #999; margin-bottom: 4px; }
+        .tmd-item {
+            display: block; width: 100%; text-align: left; padding: 12px 14px; font-size: 15px; font-weight: bold;
+            color: #2c5e43; background: #f1f8f1; border: none; border-radius: 10px; cursor: pointer;
+        }
+        .tmd-item:active { background: #e0efe0; }
+        .tmd-divider { height: 1px; background: #eee; margin: 6px 0; }
+        .tmd-user-info { display: flex; align-items: center; gap: 8px; padding: 6px 4px 10px; font-size: 13px; font-weight: bold; color: #2c5e43; }
+        .tmd-user-info img { width: 32px; height: 32px; border-radius: 50%; }
 
         .container {
             background: #ffffff; padding: 25px; border-radius: 20px;
@@ -174,7 +223,7 @@
         /* 상점 화면 */
         /* 아래로 스크롤해도 지금 모습/남은 포인트가 계속 보이도록 상단에 고정 */
         .shop-sticky-header {
-            position: sticky; top: 0; z-index: 5; background: #fff;
+            position: sticky; top: 52px; z-index: 5; background: #fff;
             margin: 0 -25px; padding: 10px 25px 10px; border-bottom: 1px solid #eee;
         }
         .shop-preview { display: flex; justify-content: center; margin: 10px 0; }
@@ -398,13 +447,40 @@
 </head>
 <body>
 
+<!-- 상단 고정 내비게이션 바 (모든 화면 공통) -->
+<div class="top-nav-bar">
+    <button class="tnb-icon-btn" onclick="toggleTopMenu()" aria-label="메뉴">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+    </button>
+    <button class="tnb-icon-btn" onclick="goHome()" aria-label="홈">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/></svg>
+    </button>
+    <div class="tnb-center">
+        <span class="tnb-stone tnb-stone-black"></span>
+        <span class="tnb-brand">라온 바둑</span>
+        <span class="tnb-stone tnb-stone-white"></span>
+    </div>
+    <button class="tnb-icon-btn" onclick="goBackScreen()" aria-label="이전">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,5 8,12 15,19"/></svg>
+    </button>
+    <button class="tnb-icon-btn tnb-profile-btn" onclick="onProfileCircleClick()" aria-label="프로필">
+        <img id="tnb-profile-img" style="display:none;" onerror="this.style.display='none'; document.getElementById('tnb-profile-placeholder').style.display='block';">
+        <svg id="tnb-profile-placeholder" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+    </button>
+</div>
+<div class="top-menu-overlay" id="top-menu-overlay" onclick="closeTopMenu()"></div>
+<div class="top-menu-drawer" id="top-menu-drawer">
+    <div class="tmd-title">메뉴</div>
+    <button class="tmd-item" onclick="menuOpenCharacterSelect()">🧑‍🎨 캐릭터 선택</button>
+    <button class="tmd-item" onclick="menuOpenShop()">🛍️ 상점</button>
+    <div class="tmd-divider"></div>
+    <div id="tmd-account-section"></div>
+</div>
+
 <!-- 메인 홈 화면 -->
 <div id="screen-home" class="screen active">
     <div class="container">
         <div class="character-header" id="character-header"></div>
-        <div class="title-logo">⚫어린이 바둑교실⚪</div>
-        <h2>주제를 골라 도전하세요!</h2>
-        <p class="subtitle">주제를 누르면 매번 새로운 문제 20개가 쉬운 것부터 어려운 순서로 만들어져요.</p>
         <div class="auth-bar" id="auth-bar"></div>
         <div class="topic-list" id="topic-list"></div>
     </div>
@@ -850,25 +926,72 @@
         };
     }
 
+    // 로그인/로그아웃 UI는 상단바 오른쪽 끝의 프로필 원(클릭 시 로그인, 로그인 상태면 메뉴 서랍)과
+    // 햄버거 메뉴 서랍 안의 계정 영역으로 모았다 - 홈 화면에는 "바둑 게임 해보기" 버튼만 남긴다.
     function renderAuthBar() {
         const bar = document.getElementById('auth-bar');
-        if (!bar) return;
-        if (currentUser) {
-            bar.innerHTML = `
-                <button class="home-btn play-entry-btn" onclick="openPlayMenu()">🎮 바둑 게임 해보기</button>
-                <div class="user-bar">
-                    <div class="user-info">
-                        <img src="${currentUser.photoURL || ''}" onerror="this.style.display='none'">
-                        <span>${currentUser.displayName || '바둑이'}님 환영해요!</span>
-                    </div>
-                    <button class="logout-btn" onclick="signOutUser()">로그아웃</button>
-                </div>`;
-        } else {
-            bar.innerHTML = `
-                <button class="login-btn" onclick="signInGoogle()">
-                    🔵 구글 계정으로 로그인하고 기록 저장하기
-                </button>`;
+        if (bar) {
+            bar.innerHTML = `<button class="home-btn play-entry-btn" onclick="openPlayMenu()">🎮 바둑 게임 해보기</button>`;
         }
+        renderTopBarAccount();
+    }
+
+    function renderTopBarAccount() {
+        const profileImg = document.getElementById('tnb-profile-img');
+        const profilePlaceholder = document.getElementById('tnb-profile-placeholder');
+        const accountSection = document.getElementById('tmd-account-section');
+        if (!profileImg || !accountSection) return;
+        if (currentUser) {
+            if (currentUser.photoURL) {
+                profileImg.src = currentUser.photoURL;
+                profileImg.style.display = 'block';
+                profilePlaceholder.style.display = 'none';
+            } else {
+                profileImg.style.display = 'none';
+                profilePlaceholder.style.display = 'block';
+            }
+            accountSection.innerHTML = `
+                <div class="tmd-user-info">
+                    <img src="${currentUser.photoURL || ''}" onerror="this.style.display='none'">
+                    <span>${currentUser.displayName || '바둑이'}님</span>
+                </div>
+                <button class="tmd-item" onclick="closeTopMenu(); signOutUser();">🚪 로그아웃</button>`;
+        } else {
+            profileImg.style.display = 'none';
+            profilePlaceholder.style.display = 'block';
+            accountSection.innerHTML = `
+                <button class="tmd-item" onclick="closeTopMenu(); signInGoogle();">🔵 구글 계정으로 로그인</button>`;
+        }
+    }
+
+    // 프로필 원 클릭: 로그아웃 상태면 바로 구글 로그인을, 로그인 상태면(로그아웃 등은 서랍 안에 있으니)
+    // 메뉴 서랍을 연다.
+    function onProfileCircleClick() {
+        if (currentUser) { toggleTopMenu(); } else { signInGoogle(); }
+    }
+
+    function toggleTopMenu() {
+        const drawer = document.getElementById('top-menu-drawer');
+        if (drawer.classList.contains('open')) { closeTopMenu(); } else { openTopMenu(); }
+    }
+    function openTopMenu() {
+        document.getElementById('top-menu-drawer').classList.add('open');
+        document.getElementById('top-menu-overlay').classList.add('open');
+    }
+    function closeTopMenu() {
+        document.getElementById('top-menu-drawer').classList.remove('open');
+        document.getElementById('top-menu-overlay').classList.remove('open');
+    }
+    function menuOpenCharacterSelect() {
+        closeTopMenu();
+        if (!currentUser) { alert('먼저 구글 로그인을 해주세요!'); return; }
+        openCharacterSelect();
+    }
+    function menuOpenShop() {
+        closeTopMenu();
+        if (!currentUser) { alert('먼저 구글 로그인을 해주세요!'); return; }
+        if (!getActiveCharacter()) { openCharacterSelect(); return; }
+        openShop();
     }
 
     auth.onAuthStateChanged(async (user) => {
@@ -2222,9 +2345,27 @@
         });
     }
 
+    // 상단바 "이전" 아이콘용 화면 이동 기록. goBackScreen()으로 되돌아갈 때는 그 자체를
+    // 다시 기록에 쌓지 않도록 isNavigatingBack 플래그로 한 번만 건너뛴다.
+    let screenHistory = [];
+    let isNavigatingBack = false;
+
     function switchScreen(screenId) {
+        const current = document.querySelector('.screen.active');
+        if (current && current.id !== screenId && !isNavigatingBack) {
+            screenHistory.push(current.id);
+        }
+        isNavigatingBack = false;
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
+    }
+
+    function goBackScreen() {
+        closeTopMenu();
+        if (screenHistory.length === 0) { goHome(); return; }
+        const prev = screenHistory.pop();
+        isNavigatingBack = true;
+        switchScreen(prev);
     }
 
     function goHome() {
