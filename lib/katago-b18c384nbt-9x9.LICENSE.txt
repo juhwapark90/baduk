@@ -1,0 +1,64 @@
+katago-b18c384nbt-9x9.onnx
+===========================
+
+Neural network weights: derived from the official KataGo distributed
+training run ("kata1"), network name:
+
+    kata1-b18c384nbt-s9996604416-d4316597426
+
+Downloaded from:
+    https://media.katagotraining.org/uploaded/networks/zips/kata1/kata1-b18c384nbt-s9996604416-d4316597426.zip
+
+License for the network weights (kata1 run networks), per
+https://katagotraining.org/network_license/ :
+
+    Copyright 2026 David J Wu ("lightvector").
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of the neural net files or training weight files (the "Software"),
+    to deal in the Software without restriction, including without
+    limitation the rights to use, copy, modify, merge, publish, distribute,
+    sublicense, and/or sell copies of the Software, and to permit persons to
+    whom the Software is furnished to do so, subject to the following
+    conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+    OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+    IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Conversion tooling: adapted from kaya-go/katago-onnx (MIT licensed),
+https://github.com/kaya-go/katago-onnx, using KataGo's own PyTorch
+training/model code from https://github.com/lightvector/KataGo
+(python/katago/train/{load_model.py,model_pytorch.py}).
+
+Deviation from the originally planned g170/b6c96 network: the archived
+g170 checkpoints (https://katagoarchive.org/g170/) turned out to be
+TensorFlow-era artifacts (SavedModel + a custom text format), not PyTorch
+checkpoints, and their architecture ("version": 8) predates and is
+unsupported by KataGo's current PyTorch training code (which only
+supports feature/model version 10+). Reimplementing that obsolete
+architecture from scratch, with no reference engine on hand to validate
+correctness, was judged too high-risk for an AI opponent. Instead, this
+file was converted from the smallest network family in KataGo's currently
+active, PyTorch-native "kata1" distributed training run
+(b18c384nbt), which carries the permissive MIT-style license quoted above
+(note: this is NOT the CC0 g170 license originally targeted).
+
+Export details:
+  - Exported to ONNX opset 17 via torch.onnx.export(..., dynamo=False),
+    with dynamic_axes over batch size and spatial height/width, so a
+    single graph accepts any board size (verified working at 9x9).
+  - Full-precision export was 115,800,126 bytes (~110 MiB), which exceeds
+    GitHub's 100 MB per-file push limit, so it could not be committed here.
+  - This committed file is the dynamically quantized UINT8 weights
+    variant (via onnxruntime.quantization.quantize_dynamic), 30,490,986
+    bytes (~29.1 MiB), which passed onnx.checker.check_model and produced
+    correct-shaped, NaN-free outputs in an onnxruntime smoke test with a
+    9x9 dummy input (bin_input: [1,22,9,9], global_input: [1,19]).
