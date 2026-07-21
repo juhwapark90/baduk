@@ -662,6 +662,7 @@
         <div id="quiz-results-table-wrap" style="display:none; width:100%;"></div>
         <div class="result-save-msg" id="result-save-msg"></div>
         <div class="result-btns">
+            <button class="home-btn" id="result-leveltest-btn" style="display:none" onclick="startLevelTest()"><svg class="icon-goboard" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="20" height="20" rx="3" fill="#dcb35c" stroke="#8a5a1e" stroke-width="1.5"/><path d="M2 9h20M2 15h20M9 2v20M15 2v20" stroke="#8a5a1e" stroke-width="1" opacity="0.85"/><circle cx="9" cy="9" r="3.4" fill="#2b2b2b"/><circle cx="15" cy="15" r="3.4" fill="#fdfdfd" stroke="#9c9c9c" stroke-width="0.8"/></svg> 레벨테스트 하러가기</button>
             <button class="home-btn" onclick="retryTopic()">🔄 이 주제 다시 도전</button>
             <button class="home-btn" onclick="backToTopicList()">🏠 주제 목록</button>
         </div>
@@ -2842,8 +2843,11 @@
         document.getElementById('learn-caption').innerText = slide.desc;
         document.getElementById('learn-progress').innerText = `${currentLearnIdx + 1} / ${currentLearnSlides.length}`;
         document.getElementById('learn-prev-btn').style.visibility = currentLearnIdx === 0 ? 'hidden' : 'visible';
-        document.getElementById('learn-next-btn').innerText =
-            currentLearnIdx === currentLearnSlides.length - 1 ? '퀴즈 풀러가기 ▶' : '다음 ▶';
+        const isLastSlide = currentLearnIdx === currentLearnSlides.length - 1;
+        const isLastProblem = currentProblemIndex === problemsList.length - 1;
+        document.getElementById('learn-next-btn').innerText = !isLastSlide ? '다음 ▶'
+            : inExplanationMode ? (isLastProblem ? '결과 확인하기 ▶' : '다음 문제 보기 ▶')
+            : '퀴즈 풀러가기 ▶';
     }
 
     function learnPrev() {
@@ -3194,6 +3198,7 @@
         document.getElementById('result-topic-msg').innerText =
             `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
         renderQuizResultsTable();
+        document.getElementById('result-leveltest-btn').style.display = topic.levelTest ? '' : 'none';
         const saveMsgEl = document.getElementById('result-save-msg');
         if (currentUser && getActiveCharacter()) {
             const result = saveTopicResult(currentTopicKey, totalScore, roundMax);
