@@ -2249,23 +2249,24 @@
         }
     ];
 
-    // Lv.5 실전 퀴즈 10문제 - "활로가 적은 돌 찾기" 개념 슬라이드와 같은 원리(활로 2개짜리 백돌을
-    // 열린 쪽에서 공격해 가장자리 쪽으로 몰아야 한다)를 각기 다른 위치/방향/주변 돌 구성으로
-    // 10번 반복한다. 전부 같은 검증된 뼈대(target 좌우로 흑돌이 하나씩 붙고, 그중 한쪽을 흑돌 하나가
-    // 더 이어서 "막힌 쪽"을 만든다)를 회전·대칭·이동시켜 만들었고, 스크립트로 각 문제마다
-    // "정답(attack)을 두면 활로 2개로 도망가고, 반대(flee)를 두면 활로 3개로 도망간다"를 전부
-    // 검증했다 - 그래서 attack이 항상 유일한 정답이고 flee는 "그럴듯하지만 틀린" 오답이 된다.
+    // Lv.5 실전 퀴즈 10문제 - "활로가 적은 돌 찾기" 개념과 같은 원리(활로 2개짜리 백돌 무리를
+    // 열린 쪽에서 공격해 가장자리 쪽으로 몰아야 한다)를 서로 다른 모양으로 섞어서 10번 담았다.
+    // 문제마다 상황이 똑같아 보이지 않도록 세 가지 서로 다른 백돌 모양을 회전·대칭·이동시켜 섞었다:
+    // (1) 돌 1개짜리(3문제), (2) 세로로 3개 이어진 돌(3문제), (3) 참고 사진처럼 꺾인 모양의 돌
+    // 4개 무리(4문제). 모두 스크립트로 "정답(attack)을 두면 백돌이 도망가도 활로가 더 적고,
+    // 반대(flee)를 두면 활로가 더 많이 남는다"를 검증했다 - attack이 유일한 정답, flee는
+    // "얼핏 단수가 되는 것 같지만 전략적으로는 틀린" 오답이 된다.
     const LV5_QUIZ_CONFIGS = [
-        { black: [[3,4],[5,4],[5,5],[7,1],[7,6]], white: [[1,1],[1,2]], target: [4,4], attack: [4,3], flee: [4,5], fledLibsGoodPoints: [[3,5],[4,6]], fledLibsBadPoints: [[3,3],[5,3],[4,2]] },
-        { black: [[3,4],[3,6],[2,6],[0,2]], white: [[0,8]], target: [3,5], attack: [4,5], flee: [2,5], fledLibsGoodPoints: [[1,5],[2,4]], fledLibsBadPoints: [[5,5],[4,4],[4,6]] },
-        { black: [[6,4],[4,4],[4,3],[8,7]], white: [[2,1],[2,0]], target: [5,4], attack: [5,5], flee: [5,3], fledLibsGoodPoints: [[6,3],[5,2]], fledLibsBadPoints: [[4,5],[6,5],[5,6]] },
-        { black: [[5,4],[5,2],[6,2],[8,0]], white: [[3,6]], target: [5,3], attack: [4,3], flee: [6,3], fledLibsGoodPoints: [[7,3],[6,4]], fledLibsBadPoints: [[3,3],[4,2],[4,4]] },
-        { black: [[5,3],[3,3],[3,4],[7,6],[7,7]], white: [[1,1]], target: [4,3], attack: [4,2], flee: [4,4], fledLibsGoodPoints: [[5,4],[4,5]], fledLibsBadPoints: [[3,2],[5,2],[4,1]] },
-        { black: [[5,6],[5,4],[4,4]], white: [[8,8]], target: [5,5], attack: [6,5], flee: [4,5], fledLibsGoodPoints: [[3,5],[4,6]], fledLibsBadPoints: [[7,5],[6,4],[6,6]] },
-        { black: [[2,4],[4,4],[4,3]], white: [[6,1],[6,0]], target: [3,4], attack: [3,5], flee: [3,3], fledLibsGoodPoints: [[2,3],[3,2]], fledLibsBadPoints: [[2,5],[4,5],[3,6]] },
-        { black: [[3,2],[3,4],[4,4],[6,6],[7,6]], white: [], target: [3,3], attack: [2,3], flee: [4,3], fledLibsGoodPoints: [[5,3],[4,2]], fledLibsBadPoints: [[1,3],[2,2],[2,4]] },
-        { black: [[1,5],[3,5],[3,6]], white: [[5,2],[5,3]], target: [2,5], attack: [2,4], flee: [2,6], fledLibsGoodPoints: [[1,6],[2,7]], fledLibsBadPoints: [[1,4],[3,4],[2,3]] },
-        { black: [[6,3],[6,5],[5,5]], white: [[3,1]], target: [6,4], attack: [7,4], flee: [5,4], fledLibsGoodPoints: [[4,4],[5,3]], fledLibsBadPoints: [[8,4],[7,3],[7,5]] }
+        { black: [[3,4],[5,4],[5,5],[7,1]], white: [[1,1]], targets: [[4,4]], attack: [4,3], flee: [4,5], fledLibsGoodPoints: [[3,5],[4,6]], fledLibsBadPoints: [[3,3],[5,3],[4,2]] },
+        { black: [[3,6],[3,4],[2,4]], white: [[0,2]], targets: [[3,5]], attack: [4,5], flee: [2,5], fledLibsGoodPoints: [[1,5],[2,6]], fledLibsBadPoints: [[5,5],[4,4],[4,6]] },
+        { black: [[6,3],[4,3],[4,2],[8,0]], white: [], targets: [[5,3]], attack: [5,4], flee: [5,2], fledLibsGoodPoints: [[6,2],[5,1]], fledLibsBadPoints: [[4,4],[6,4],[5,5]] },
+        { black: [[2,2],[4,2],[2,3],[4,3],[2,4],[4,4],[4,5]], white: [[6,6]], targets: [[3,2],[3,3],[3,4]], attack: [3,1], flee: [3,5], fledLibsGoodPoints: [[2,5],[3,6]], fledLibsBadPoints: [[2,1],[4,1],[3,0]] },
+        { black: [[4,3],[4,5],[3,3],[3,5],[2,3],[2,5],[1,5],[6,1]], white: [], targets: [[4,4],[3,4],[2,4]], attack: [5,4], flee: [1,4], fledLibsGoodPoints: [[0,4],[1,3]], fledLibsBadPoints: [[6,4],[5,3],[5,5]] },
+        { black: [[4,5],[6,5],[4,4],[6,4],[4,3],[6,3],[6,2]], white: [[8,8]], targets: [[5,5],[5,4],[5,3]], attack: [5,6], flee: [5,2], fledLibsGoodPoints: [[4,2],[5,1]], fledLibsBadPoints: [[4,6],[6,6],[5,7]] },
+        { black: [[4,3],[6,3],[4,4],[3,5],[6,5],[4,6],[5,6]], white: [[2,1]], targets: [[5,3],[5,4],[5,5],[4,5]], attack: [5,2], flee: [6,4], fledLibsGoodPoints: [[7,4]], fledLibsBadPoints: [[4,2],[6,2],[5,1]] },
+        { black: [[4,4],[4,6],[3,4],[2,3],[2,6],[1,4],[1,5]], white: [], targets: [[4,5],[3,5],[2,5],[2,4]], attack: [5,5], flee: [3,6], fledLibsGoodPoints: [[3,7]], fledLibsBadPoints: [[6,5],[5,4],[5,6]] },
+        { black: [[3,4],[5,4],[3,3],[2,2],[5,2],[3,1],[4,1]], white: [[1,1]], targets: [[4,4],[4,3],[4,2],[3,2]], attack: [4,5], flee: [5,3], fledLibsGoodPoints: [[6,3]], fledLibsBadPoints: [[3,5],[5,5],[4,6]] },
+        { black: [[3,5],[3,3],[4,5],[5,6],[5,3],[6,5],[6,4]], white: [], targets: [[3,4],[4,4],[5,4],[5,5]], attack: [2,4], flee: [4,3], fledLibsGoodPoints: [[4,2]], fledLibsBadPoints: [[1,4],[2,3],[2,5]] }
     ];
 
     function lv5Pt(p) { return { x: p[0], y: p[1] }; }
@@ -2276,9 +2277,9 @@
         return {
             type: 'play_single',
             blackStones: cfg.black.map(lv5Pt),
-            whiteStones: [...cfg.white.map(lv5Pt), lv5Pt(cfg.target)],
+            whiteStones: [...cfg.white.map(lv5Pt), ...cfg.targets.map(lv5Pt)],
             answers: [lv5Pt(cfg.attack)],
-            desc: '활로가 2개인 흰 돌이에요. 활로가 더 적어지는 쪽을 공격해서 단수쳐 보세요!',
+            desc: '활로가 2개인 흰 돌 무리예요. 활로가 더 적어지는 쪽을 공격해서 단수쳐 보세요!',
             explainSlides: buildLv5ExplainSlides(cfg)
         };
     }
@@ -2286,24 +2287,24 @@
     // 문제 하나마다 붙는 해설 슬라이드(3장) - 개념 배우기와 같은 학습 슬라이드 형식을 그대로 재사용한다.
     function buildLv5ExplainSlides(cfg) {
         const black = cfg.black.map(lv5Pt), white = cfg.white.map(lv5Pt);
-        const target = lv5Pt(cfg.target), attack = lv5Pt(cfg.attack), flee = lv5Pt(cfg.flee);
+        const targets = cfg.targets.map(lv5Pt), attack = lv5Pt(cfg.attack), flee = lv5Pt(cfg.flee);
         return [
             {
                 title: '정답 확인: 여기를 공격해요',
                 desc: '이 자리를 막으면 백돌은 활로가 적어지는 쪽으로 도망칠 수밖에 없어요.',
-                blackStones: [...black, attack], whiteStones: [...white, target],
+                blackStones: [...black, attack], whiteStones: [...white, ...targets],
                 lastMove: attack
             },
             {
-                title: '백돌이 도망가도 활로가 2개뿐이에요',
-                desc: '백돌이 유일한 활로로 도망가도 활로가 2개뿐이라 잡기 쉬워요.',
-                blackStones: [...black, attack], whiteStones: [...white, target, flee],
+                title: '백돌이 도망가도 활로가 더 적어요',
+                desc: `백돌이 유일한 활로로 도망가도 활로가 ${cfg.fledLibsGoodPoints.length}개뿐이라 잡기 쉬워요.`,
+                blackStones: [...black, attack], whiteStones: [...white, ...targets, flee],
                 lastMove: flee, highlights: cfg.fledLibsGoodPoints.map(lv5Pt)
             },
             {
                 title: '만약 반대쪽을 공격했다면?',
-                desc: '반대쪽을 공격했다면 백돌은 활로가 3개나 남는 열린 쪽으로 도망가서 잡기 훨씬 어려워졌을 거예요. 그래서 처음에 어느 쪽을 공격하는지가 중요해요!',
-                blackStones: [...black, flee], whiteStones: [...white, target, attack],
+                desc: `반대쪽을 공격했다면 백돌은 활로가 ${cfg.fledLibsBadPoints.length}개나 남는 열린 쪽으로 도망가서 잡기 훨씬 어려워졌을 거예요. 그래서 처음에 어느 쪽을 공격하는지가 중요해요!`,
+                blackStones: [...black, flee], whiteStones: [...white, ...targets, attack],
                 lastMove: attack, highlights: cfg.fledLibsBadPoints.map(lv5Pt)
             }
         ];
