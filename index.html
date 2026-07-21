@@ -39,6 +39,18 @@
         };
         window.__resolveDicebearReady();
     </script>
+    <!-- AI 대국의 "프로" 난이도에서 쓰는 신경망 바둑 엔진 실행 라이브러리. 실제로 무거운
+         wasm 파일과 신경망 모델 파일 자체는 이 태그가 아니라, 사용자가 "프로" 난이도를
+         처음 선택하는 순간(ensureKataSession)에야 지연 로딩된다. -->
+    <script src="lib/ort/ort.wasm.min.js"></script>
+    <script>
+        if (window.ort) {
+            // 상대 경로 문자열이면 내부적으로 동적 import()가 "맨 이름(bare specifier)"으로 취급해
+            // 해석에 실패하므로, 페이지 base 기준 절대 URL로 만들어준다(서브경로 배포에도 안전).
+            ort.env.wasm.wasmPaths = new URL('lib/ort/', document.baseURI).href;
+            ort.env.wasm.numThreads = 1; // GitHub Pages는 COOP/COEP 헤더를 못 붙이므로 스레드 비활성화
+        }
+    </script>
     <style>
         body {
             font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
@@ -682,6 +694,7 @@
         <button class="home-btn" onclick="startAiGame('beginner')">🌱 초보</button>
         <button class="home-btn" onclick="startAiGame('mid')">⚔️ 중수</button>
         <button class="home-btn" onclick="startAiGame('high')">🏆 고수</button>
+        <button class="home-btn" onclick="startAiGame('pro')">🧠 프로 (AI 신경망)</button>
         <button class="btn btn-back" onclick="switchScreen('screen-play-menu')">◀ 뒤로</button>
     </div>
 </div>
@@ -3174,7 +3187,7 @@
     let playOpponentName = '';
     let playAiDifficulty = null;
     let playGameEnded = false;     // 대국종료 후에는 새 대국을 시작하기 전까지 착수/되돌리기를 막는다
-    const AI_DIFFICULTY_LABEL = { beginner0: '왕초보', beginner: '초보', mid: '중수', high: '고수' };
+    const AI_DIFFICULTY_LABEL = { beginner0: '왕초보', beginner: '초보', mid: '중수', high: '고수', pro: '프로' };
 
     function playInBounds(x, y) { return x >= 0 && x <= 8 && y >= 0 && y <= 8; }
     function playNeighbors(x, y) {
@@ -3799,9 +3812,178 @@
         return bestMove;
     }
 
-    function aiTakeTurn() {
+    /* ---------- 신경망 기반 AI ("프로" 난이도) ----------
+     * KataGo 공식 학습 체크포인트(kata1-b18c384nbt)를 9x9용으로 변환한 신경망을 브라우저에서
+     * 그대로 돌린다(onnxruntime-web, WASM 백엔드). 몬테카를로 탐색 없이 정책망 순전파 결과만
+     * 쓰기 때문에 곧바로(대략 0.1~1초) 응답하지만, 그만큼 아주 깊은 수읽기에서는 가끔 실수할
+     * 수도 있다 - 그래도 기존 규칙기반 난이도들보다 훨씬 폭넓고 자연스러운 감각으로 둔다.
+     * lib/katago-b18c384nbt-9x9.onnx / lib/katago-b18c384nbt-9x9.LICENSE.txt 참고. */
+    const KATA_N = 9;
+    const KATA_PASS_INDEX = KATA_N * KATA_N;
+    let kataSessionPromise = null;
+    function ensureKataSession() {
+        if (!kataSessionPromise) kataSessionPromise = ort.InferenceSession.create('./lib/katago-b18c384nbt-9x9.onnx');
+        return kataSessionPromise;
+    }
+
+    // (x,y)가 아군/상대 어느 쪽이든 사다리로 확실히 잡히는 무리에 속해 있으면 plane에 표시한다.
+    // KataGo 공식 사다리 피처(입력 채널 14~16)의 근사치로, 앱에 이미 있는 readLadder를 그대로 쓴다.
+    function kataMarkLadderPlane(board, plane) {
+        const seen = new Set();
+        for (let y = 0; y < KATA_N; y++) for (let x = 0; x < KATA_N; x++) {
+            const color = board[y][x];
+            if (!color) continue;
+            const k = x + '_' + y;
+            if (seen.has(k)) continue;
+            const g = getGroupAndLiberties(board, x, y);
+            g.stones.forEach(([sx, sy]) => seen.add(sx + '_' + sy));
+            if (g.liberties !== 1 && g.liberties !== 2) continue;
+            const chaser = color === 'black' ? 'white' : 'black';
+            if (readLadder(board, x, y, chaser)) {
+                g.stones.forEach(([sx, sy]) => { plane[sy * KATA_N + sx] = 1; });
+            }
+        }
+    }
+
+    // board에서 pla가 (x,y)에 두면 koBoard를 그대로 재현해서 막히는 유일한 지점(패)을 찾는다.
+    function kataFindSimpleKoPoint(board, pla, koBoard) {
+        if (!koBoard) return null;
+        for (let y = 0; y < KATA_N; y++) for (let x = 0; x < KATA_N; x++) {
+            if (board[y][x] !== 0) continue;
+            const r = tryPlayMove(board, x, y, pla, koBoard);
+            if (!r.ok && r.reason === 'ko') return { x, y };
+        }
+        return null;
+    }
+
+    // playHistory/playLastMove/playConsecutivePasses(전역 대국 상태)를 KataGo가 기대하는
+    // "최근 N수" 목록으로 바꾼다. playPass는 playLastMove를 안 건드리므로(마지막 실제 착수
+    // 지점만 계속 들고 있음), 각 수가 패였는지는 스냅샷 간 passes 카운터 증가로 판단한다.
+    function kataExtractRecentPlies(maxPlies) {
+        const numPlies = playHistory.length;
+        if (numPlies === 0) return [];
+        const entries = playHistory.concat([{ lastMove: playLastMove, passes: playConsecutivePasses }]);
+        const start = Math.max(0, numPlies - maxPlies);
+        const plies = [];
+        for (let k = start; k < numPlies; k++) {
+            const wasPass = entries[k + 1].passes > entries[k].passes;
+            const loc = wasPass ? null : entries[k + 1].lastMove;
+            plies.push({ loc });
+        }
+        return plies;
+    }
+
+    // board/pla/koBoard로부터 KataGo 신경망 입력 텐서(22채널 평면 + 19 전역 피처)를 만든다.
+    // python/katago/game/features.py의 fill_row_features를 그대로 옮긴 것이며, 사다리(14~16)와
+    // 집 소유권(18~19)만 앱에 이미 있는 근사 로직(readLadder/computeTerritoryOwnership)을 쓴다.
+    function buildKataInputs(board, pla, koBoard) {
+        const opp = pla === 'black' ? 'white' : 'black';
+        const bin = Array.from({ length: 22 }, () => new Float32Array(KATA_N * KATA_N));
+        const glob = new Float32Array(19);
+
+        for (let y = 0; y < KATA_N; y++) for (let x = 0; x < KATA_N; x++) {
+            const pos = y * KATA_N + x;
+            bin[0][pos] = 1.0;
+            const stone = board[y][x];
+            if (stone === pla) bin[1][pos] = 1.0;
+            else if (stone === opp) bin[2][pos] = 1.0;
+            if (stone === pla || stone === opp) {
+                const g = getGroupAndLiberties(board, x, y);
+                if (g.liberties === 1) bin[3][pos] = 1.0;
+                else if (g.liberties === 2) bin[4][pos] = 1.0;
+                else if (g.liberties === 3) bin[5][pos] = 1.0;
+            }
+        }
+
+        const koPoint = kataFindSimpleKoPoint(board, pla, koBoard);
+        if (koPoint) bin[6][koPoint.y * KATA_N + koPoint.x] = 1.0;
+
+        const recent = kataExtractRecentPlies(5).reverse(); // recent[0] = 가장 최근 수
+        const chIdx = [9, 10, 11, 12, 13];
+        recent.forEach((ply, i) => {
+            if (ply.loc) bin[chIdx[i]][ply.loc.y * KATA_N + ply.loc.x] = 1.0;
+            else glob[i] = 1.0;
+        });
+
+        kataMarkLadderPlane(board, bin[14]);
+        const prevBoard = playHistory.length > 0 ? playHistory[playHistory.length - 1].board : null;
+        const prevPrevBoard = playHistory.length > 1 ? playHistory[playHistory.length - 2].board : null;
+        kataMarkLadderPlane(prevBoard || board, bin[15]);
+        kataMarkLadderPlane(prevPrevBoard || prevBoard || board, bin[16]);
+
+        const { mySet, oppSet } = computeTerritoryOwnership(board, pla);
+        for (let y = 0; y < KATA_N; y++) for (let x = 0; x < KATA_N; x++) {
+            const pos = y * KATA_N + x;
+            const key = x + '_' + y;
+            if (board[y][x] === pla || mySet.has(key)) bin[18][pos] = 1.0;
+            else if (board[y][x] === opp || oppSet.has(key)) bin[19][pos] = 1.0;
+        }
+
+        glob[14] = 1.0; // passWouldEndPhase (이 앱은 앙코르 없는 지역 계가 규칙을 쓴다)
+        // glob[5](자기 덤)/glob[6..13,15..17](패 규칙 종류·수이사이·지역계가 세부 규칙)은 이 앱에
+        // 해당 없어 0으로 둔다. glob[18]("wave")도 덤 0 기준으로 공식대로 계산하면 늘 0이라 생략한다.
+
+        const binFlat = new Float32Array(22 * KATA_N * KATA_N);
+        for (let c = 0; c < 22; c++) binFlat.set(bin[c], c * KATA_N * KATA_N);
+        return { binFlat, glob };
+    }
+
+    // 신경망 정책 출력(정책 헤드는 6종류 중 0번이 실제 착수 정책)을 소프트맥스한 뒤, 지금 판에서
+    // 실제로 합법인 수들로만 후보를 추려 그중 확률이 높은 몇 곳 중 하나를 가중치대로 고른다.
+    async function aiChooseMoveNeural(board, color, koBoard) {
+        const session = await ensureKataSession();
+        const { binFlat, glob } = buildKataInputs(board, color, koBoard);
+        const feeds = {
+            bin_input: new ort.Tensor('float32', binFlat, [1, 22, KATA_N, KATA_N]),
+            global_input: new ort.Tensor('float32', glob, [1, 19]),
+        };
+        const results = await session.run(feeds);
+        const numMoves = KATA_N * KATA_N + 1;
+        const head0 = results.policy.data.slice(0, numMoves); // [1,6,82]에서 0번 헤드(착수 정책)만
+        const maxLogit = Math.max(...head0);
+        const exps = Array.from(head0, v => Math.exp(v - maxLogit));
+        const sumExp = exps.reduce((a, b) => a + b, 0);
+        const probs = exps.map(v => v / sumExp);
+
+        const legalMoves = listLegalMoves(board, color, koBoard);
+        const legalSet = new Set(legalMoves.map(m => m.x + '_' + m.y));
+        const candidates = [];
+        for (let y = 0; y < KATA_N; y++) for (let x = 0; x < KATA_N; x++) {
+            if (!legalSet.has(x + '_' + y)) continue;
+            candidates.push({ move: { x, y }, p: probs[y * KATA_N + x] });
+        }
+        candidates.push({ move: null, p: probs[KATA_PASS_INDEX] }); // 패
+        candidates.sort((a, b) => b.p - a.p);
+
+        // 확률 상위 몇 곳 중 하나를 가중치대로 뽑는다(매번 완전히 같은 수만 반복하지 않도록).
+        const top = candidates.slice(0, Math.min(3, candidates.length));
+        const topSum = top.reduce((s, c) => s + c.p, 0);
+        let r = Math.random() * topSum;
+        for (const c of top) {
+            r -= c.p;
+            if (r <= 0) return c.move;
+        }
+        return top[0].move;
+    }
+
+    async function aiTakeTurn() {
         if (playGameEnded || playMode !== 'ai' || playTurn !== 'white') return;
         const koBoard = playHistory.length > 0 ? playHistory[playHistory.length - 1].board : null;
+        if (playAiDifficulty === 'pro') {
+            document.getElementById('play-message').innerText = 'AI가 생각하고 있어요... 🤔';
+            let move;
+            try {
+                move = await aiChooseMoveNeural(playBoard, 'white', koBoard);
+            } catch (e) {
+                console.error('신경망 AI 실행 중 오류 - 규칙기반 AI로 대신 둡니다:', e);
+                move = aiChooseMove(playBoard, 'white', 'high', koBoard);
+            }
+            document.getElementById('play-message').innerText = '';
+            if (playGameEnded || playMode !== 'ai' || playTurn !== 'white') return; // 생각하는 동안 상황이 바뀌면 무시
+            if (!move) { playPass(true); return; }
+            attemptPlayMove(move.x, move.y);
+            return;
+        }
         const move = aiChooseMove(playBoard, 'white', playAiDifficulty, koBoard);
         if (!move) { playPass(true); return; }
         attemptPlayMove(move.x, move.y);
