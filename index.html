@@ -2558,16 +2558,16 @@
           learnSlides: ATARIATTACK1_LEARN_SLIDES, strictMode: true,
           tiers: LV5_QUIZ_CONFIGS.map(cfg => () => buildLv5QuizProblem(cfg)),
           counts: LV5_QUIZ_CONFIGS.map(() => 1),
-          // 레벨테스트: 활로 2개짜리 흰 돌 3개(세로로 이어짐, 양옆이 흑돌로 막힘)를 실제로
-          // 끝까지 잡아내야 통과한다 - 퀴즈처럼 정답 한 곳을 클릭하는 게 아니라, 전용 "생존 AI"가
-          // 도망치는 흰 돌을 상대로 실제 대국처럼 여러 수를 두며 진짜로 잡아야 한다.
+          // 레벨테스트: 활로 2개짜리 흰 돌 3개(꺾인 모양, 양옆이 흑돌로 막힘)를 실제로 끝까지
+          // 잡아내야 통과한다 - 퀴즈처럼 정답 한 곳을 클릭하는 게 아니라, 전용 "생존 AI"가 도망치는
+          // 흰 돌을 상대로 실제 대국처럼 여러 수를 두며 진짜로 잡아야 한다.
           // 일부러 비대칭 배치(가장자리와 무관): 백 무리 위쪽으로 두 칸 떨어진 곳에 흑돌을 하나 더
-          // 미리 놓아뒀다. 아래쪽 활로(5,6)를 먼저 막으면 백이 그 미리 놓인 흑돌 쪽(위)으로 몰리면서
-          // 도망갈 방향이 막혀 잡히지만, 위쪽 활로(5,2)를 먼저 막으면 백이 아래의 열린 공간으로
+          // 미리 놓아뒀다. (3,4) 활로를 먼저 막으면 백이 그 미리 놓인 흑돌 쪽(5,2)으로 몰리면서
+          // 도망갈 방향이 막혀 잡히지만, (5,2) 활로를 먼저 막으면 백이 왼쪽의 열린 공간으로
           // 도망쳐 살아남기 쉽다 - "어느 쪽부터 몰아야 하는지" 판단이 핵심.
           levelTest: {
-              black: [[4, 3], [4, 4], [4, 5], [6, 3], [6, 4], [6, 5], [5, 1]],
-              white: [[5, 3], [5, 4], [5, 5]],
+              black: [[4, 3], [6, 3], [6, 4], [4, 5], [5, 5], [5, 1]],
+              white: [[5, 3], [4, 4], [5, 4]],
               desc: '이 백돌 3개를 끝까지 몰아서 잡아보세요! 어느 쪽 활로부터 막아야 백돌이 도망갈 곳이 없는지 잘 생각해보세요.',
               moveLimit: 20
           } },
@@ -4080,49 +4080,88 @@
 
     // 레벨테스트의 백돌 AI - "고수" 난이도 규칙기반 엔진을 그대로 쓴다(잡을 수 있으면 바로 잡고,
     // 단수에 몰리면 도망치는 판단을 이미 하고 있어서 "살아남으려 애쓰는 백돌" 역할에 잘 맞는다).
-    // 레벨테스트 백돌 전용 "생존 AI" 후보 수 - 일반 aiChooseMove(고수)는 판 전체의 집 계산까지
-    // 신경 쓰다 보니 이런 국지전에서 화점 근처 같은 엉뚱한 곳에 두는 경우가 있었다. 여기서는
-    // 오직 (1) 지금 백 무리의 활로 지점, (2) 단수에 걸린 흑 무리를 잡을 수 있는 지점만 후보로
-    // 삼아서, 백이 항상 자기 돌에 "붙어서" 활로를 넓히거나 반격하는 것 말고는 두지 않게 한다.
-    function levelTestWhiteCandidateMoves(board, koBoard) {
-        const candidates = new Map();
+    // 레벨테스트 백돌 전용 "생존 AI" - 일반 aiChooseMove(고수)는 판 전체의 집 계산까지 신경 쓰다
+    // 보니 이런 국지전에서 화점 근처 같은 엉뚱한 곳에 두는 경우가 있었다. 이 전용 AI는 다음
+    // 우선순위를 그대로 따른다:
+    //   1) 지금 당장 단수인 흑 무리가 있으면(도망칠 필요와 무관하게) 무조건 그것부터 잡는다.
+    //   2) 사다리로 결국 잡히지 않는 수만 후보로 남기고(모두 사다리면 어쩔 수 없이 전부 고려),
+    //      그중 백 자신의 활로를 가장 많이 남기는 수를 고른다 - 항상 자기 돌에 "붙어서" 둔다.
+    //   3) 활로 개수가 같으면, 그 수로 흑을 단수로 몰 수 있는 쪽(도망+반격을 겸함)을 우선한다.
+    //   4) 그래도 여러 곳이 남으면, 주변이 더 넓게 트인 쪽(구석/막다른 곳 아닌 쪽)으로 도망친다.
+
+    // 지금 당장 활로 1개(단수)인 흑 무리가 있고 그 자리에 두는 게 합법이면 그 지점을 돌려준다.
+    function levelTestFindImmediateCapture(board, koBoard) {
+        const seen = new Set();
+        for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
+            if (board[y][x] !== 'black') continue;
+            const k = x + '_' + y;
+            if (seen.has(k)) continue;
+            const g = getGroupAndLiberties(board, x, y);
+            g.stones.forEach(([sx, sy]) => seen.add(sx + '_' + sy));
+            if (g.liberties === 1) {
+                const [lx, ly] = g.libertyPoints[0];
+                if (tryPlayMove(board, lx, ly, 'white', koBoard).ok) return { x: lx, y: ly };
+            }
+        }
+        return null;
+    }
+    // 이 수를 둔 뒤의 판에 활로 1개(단수)인 흑 무리가 하나라도 남는지 - 도망가면서 반격까지
+    // 되는 길인지 확인한다.
+    function levelTestCreatesBlackAtari(board) {
+        const seen = new Set();
+        for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
+            if (board[y][x] !== 'black') continue;
+            const k = x + '_' + y;
+            if (seen.has(k)) continue;
+            const g = getGroupAndLiberties(board, x, y);
+            g.stones.forEach(([sx, sy]) => seen.add(sx + '_' + sy));
+            if (g.liberties === 1) return true;
+        }
+        return false;
+    }
+    // (x,y) 주변 반경 2칸 안의 빈 칸 개수 - "이 방향이 얼마나 트여있는지"의 간단한 근사치.
+    function levelTestOpenness(board, x, y) {
+        let n = 0;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (!playInBounds(nx, ny)) continue;
+            if (board[ny][nx] === 0) n++;
+        }
+        return n;
+    }
+    function levelTestChooseWhiteMove(board, koBoard) {
+        const immediateCapture = levelTestFindImmediateCapture(board, koBoard);
+        if (immediateCapture) return immediateCapture;
+
         const seenWhite = new Set();
+        const libertyPoints = new Map();
         for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
             if (board[y][x] !== 'white') continue;
             const k = x + '_' + y;
             if (seenWhite.has(k)) continue;
             const g = getGroupAndLiberties(board, x, y);
             g.stones.forEach(([sx, sy]) => seenWhite.add(sx + '_' + sy));
-            g.libertyPoints.forEach(([lx, ly]) => candidates.set(lx + '_' + ly, [lx, ly]));
+            g.libertyPoints.forEach(([lx, ly]) => libertyPoints.set(lx + '_' + ly, [lx, ly]));
         }
-        const seenBlack = new Set();
-        for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
-            if (board[y][x] !== 'black') continue;
-            const k = x + '_' + y;
-            if (seenBlack.has(k)) continue;
-            const g = getGroupAndLiberties(board, x, y);
-            g.stones.forEach(([sx, sy]) => seenBlack.add(sx + '_' + sy));
-            if (g.liberties === 1) { const [lx, ly] = g.libertyPoints[0]; candidates.set(lx + '_' + ly, [lx, ly]); }
-        }
-        return [...candidates.values()].filter(([x, y]) => tryPlayMove(board, x, y, 'white', koBoard).ok);
-    }
-
-    // 후보 중 활로를 가장 많이 늘리는 수를 고른다(잡을 수 있으면 최우선). 사다리로 결국 잡히는
-    // 모양(활로 2개 이하 + readLadder 통과)은 감점해서, 당장 활로만 늘고 곧 다시 잡히는 헛수를 피한다.
-    function levelTestChooseWhiteMove(board, koBoard) {
-        const candidates = levelTestWhiteCandidateMoves(board, koBoard);
+        const candidates = [...libertyPoints.values()].filter(([x, y]) => tryPlayMove(board, x, y, 'white', koBoard).ok);
         if (candidates.length === 0) return null;
-        let best = null, bestScore = -Infinity;
-        candidates.forEach(([x, y]) => {
+
+        const evaluated = candidates.map(([x, y]) => {
             const result = tryPlayMove(board, x, y, 'white', koBoard);
             const newGroup = getGroupAndLiberties(result.board, x, y);
-            let score = result.captured.length * 100;
-            score += newGroup.liberties * 10;
-            if (newGroup.liberties <= 2 && readLadder(result.board, x, y, 'black')) score -= 20;
-            score += Math.random();
-            if (score > bestScore) { bestScore = score; best = [x, y]; }
+            const laddered = newGroup.liberties <= 2 && readLadder(result.board, x, y, 'black');
+            return { x, y, liberties: newGroup.liberties, laddered, atari: levelTestCreatesBlackAtari(result.board), openness: levelTestOpenness(result.board, x, y) };
         });
-        return { x: best[0], y: best[1] };
+        const safe = evaluated.filter(e => !e.laddered);
+        const pool = safe.length > 0 ? safe : evaluated;
+        const maxLibs = Math.max(...pool.map(e => e.liberties));
+        const best = pool.filter(e => e.liberties === maxLibs);
+        const atariBest = best.filter(e => e.atari);
+        const finalPool = atariBest.length > 0 ? atariBest : best;
+        const maxOpen = Math.max(...finalPool.map(e => e.openness));
+        const openest = finalPool.filter(e => e.openness === maxOpen);
+        const pick = openest[randInt(0, openest.length - 1)];
+        return { x: pick.x, y: pick.y };
     }
 
     function levelTestAiTakeTurn() {
