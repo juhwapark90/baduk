@@ -2569,7 +2569,7 @@
               black: [[4, 3], [6, 3], [6, 4], [4, 5], [5, 5], [5, 1]],
               white: [[5, 3], [4, 4], [5, 4]],
               desc: '이 백돌 3개를 끝까지 몰아서 잡아보세요! 어느 쪽 활로부터 막아야 백돌이 도망갈 곳이 없는지 잘 생각해보세요.',
-              moveLimit: 20
+              moveLimit: 12
           } },
         { key: 'atariattack2', title: '[Lv. 6] 구석으로 몰자', sub: '활로가 적어지는 쪽으로 몰아서 잡아요',
           learnSlides: ATARIATTACK2_LEARN_SLIDES, tiers: [() => genAtari(2)], counts: [5] },
@@ -3556,6 +3556,10 @@
         renderPlayTurnIndicator();
         if (result.captured.length > 0) renderPlayBars(); // 잡은 돌 수가 바뀌었을 때만 다시 그린다
 
+        // 이번 수(흑/백 누구든)로 백이 확정된 눈(홑눈) 2개 이상을 갖추게 됐다면, 더 두지 않고
+        // 바로 백의 방어 성공으로 끝낸다 - 백이 스스로 눈을 메우다 결국 잡히는 사고를 원천 차단한다.
+        if (playMode === 'leveltest' && levelTestSingleEyePoints(playBoard).length >= 2) { levelTestEndGame(false); return; }
+
         if (playMode === 'ai' && playTurn === 'white') {
             setTimeout(aiTakeTurn, 450);
         } else if (playMode === 'leveltest' && playTurn === 'white') {
@@ -4084,10 +4088,25 @@
     // 보니 이런 국지전에서 화점 근처 같은 엉뚱한 곳에 두는 경우가 있었다. 이 전용 AI는 다음
     // 우선순위를 그대로 따른다:
     //   1) 지금 당장 단수인 흑 무리가 있으면(도망칠 필요와 무관하게) 무조건 그것부터 잡는다.
-    //   2) 사다리로 결국 잡히지 않는 수만 후보로 남기고(모두 사다리면 어쩔 수 없이 전부 고려),
-    //      그중 백 자신의 활로를 가장 많이 남기는 수를 고른다 - 항상 자기 돌에 "붙어서" 둔다.
-    //   3) 활로 개수가 같으면, 그 수로 흑을 단수로 몰 수 있는 쪽(도망+반격을 겸함)을 우선한다.
-    //   4) 그래도 여러 곳이 남으면, 주변이 더 넓게 트인 쪽(구석/막다른 곳 아닌 쪽)으로 도망친다.
+    //   2) 이미 확정된 자기 눈(홑눈) 자리는 절대 스스로 메우지 않는다.
+    //   3) 한 수로 눈이 2개 이상 완성되면(=확정 생존) 그 수를 바로 둔다.
+    //   4) 사다리로 결국 잡히지 않는 수만 후보로 남기고, 그중 눈을 만들거나 눈 개수를 늘리는
+    //      수를 최우선한다 - "넓은 쪽에 집을 2채 이상 만들어 살아남으려는" 목표.
+    //   5) 눈 개수가 같으면, 백 자신의 활로를 가장 많이 남기는 수를 고른다 - 항상 붙어서 둔다.
+    //   6) 활로도 같으면, 흑을 단수로 몰 수 있는 쪽(도망+반격 겸함)을 우선한다.
+    //   7) 그래도 여러 곳이 남으면, 주변이 더 넓게 트인 쪽(구석/막다른 곳 아닌 쪽)으로 도망친다.
+
+    // 백에게 완전히 둘러싸인 "홑눈" 자리(존재하는 이웃이 전부 백돌)를 모두 찾는다 - 흑이 거기
+    // 두면 곧바로 자충수라 진짜로 안전한 눈이다. 2개 이상이면 백은 무조건 산다(2눈 생존).
+    function levelTestSingleEyePoints(board) {
+        const eyes = [];
+        for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
+            if (board[y][x] !== 0) continue;
+            const ns = playNeighbors(x, y);
+            if (ns.length > 0 && ns.every(([nx, ny]) => board[ny][nx] === 'white')) eyes.push([x, y]);
+        }
+        return eyes;
+    }
 
     // 지금 당장 활로 1개(단수)인 흑 무리가 있고 그 자리에 두는 게 합법이면 그 지점을 돌려준다.
     function levelTestFindImmediateCapture(board, koBoard) {
@@ -4143,19 +4162,29 @@
             g.stones.forEach(([sx, sy]) => seenWhite.add(sx + '_' + sy));
             g.libertyPoints.forEach(([lx, ly]) => libertyPoints.set(lx + '_' + ly, [lx, ly]));
         }
-        const candidates = [...libertyPoints.values()].filter(([x, y]) => tryPlayMove(board, x, y, 'white', koBoard).ok);
+        // 이미 확정된 홑눈 자리는 절대 스스로 메우지 않는다 - 다른 둘 곳이 정말 없을 때만 예외.
+        const confirmedEyes = new Set(levelTestSingleEyePoints(board).map(([x, y]) => x + '_' + y));
+        let candidates = [...libertyPoints.values()].filter(([x, y]) => !confirmedEyes.has(x + '_' + y) && tryPlayMove(board, x, y, 'white', koBoard).ok);
+        if (candidates.length === 0) candidates = [...libertyPoints.values()].filter(([x, y]) => tryPlayMove(board, x, y, 'white', koBoard).ok);
         if (candidates.length === 0) return null;
 
         const evaluated = candidates.map(([x, y]) => {
             const result = tryPlayMove(board, x, y, 'white', koBoard);
             const newGroup = getGroupAndLiberties(result.board, x, y);
             const laddered = newGroup.liberties <= 2 && readLadder(result.board, x, y, 'black');
-            return { x, y, liberties: newGroup.liberties, laddered, atari: levelTestCreatesBlackAtari(result.board), openness: levelTestOpenness(result.board, x, y) };
+            const eyeCount = levelTestSingleEyePoints(result.board).length;
+            return { x, y, liberties: newGroup.liberties, laddered, atari: levelTestCreatesBlackAtari(result.board), openness: levelTestOpenness(result.board, x, y), eyeCount };
         });
+        // 이 수 하나로 눈이 2개 이상 완성되면(확정 생존) 바로 그 수를 둔다.
+        const winning = evaluated.filter(e => e.eyeCount >= 2);
+        if (winning.length > 0) { const w = winning[randInt(0, winning.length - 1)]; return { x: w.x, y: w.y }; }
         const safe = evaluated.filter(e => !e.laddered);
         const pool = safe.length > 0 ? safe : evaluated;
-        const maxLibs = Math.max(...pool.map(e => e.liberties));
-        const best = pool.filter(e => e.liberties === maxLibs);
+        // 눈을 만들거나 눈 개수를 늘리는 수를 최우선한다 - "넓은 쪽에 집을 만들어 살아남는" 목표.
+        const maxEyes = Math.max(...pool.map(e => e.eyeCount));
+        const eyePool = pool.filter(e => e.eyeCount === maxEyes);
+        const maxLibs = Math.max(...eyePool.map(e => e.liberties));
+        const best = eyePool.filter(e => e.liberties === maxLibs);
         const atariBest = best.filter(e => e.atari);
         const finalPool = atariBest.length > 0 ? atariBest : best;
         const maxOpen = Math.max(...finalPool.map(e => e.openness));
