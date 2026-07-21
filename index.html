@@ -299,6 +299,9 @@
             color: white; background-color: #2c5e43; border: none; border-radius: 10px; cursor: pointer;
         }
 
+        /* 바둑판+돌 모양 아이콘 (게임기 이모지 🎮 대신 쓴다) - 글자 크기에 맞춰 같이 커지도록 em 단위 사용 */
+        .icon-goboard { width: 1.15em; height: 1.15em; vertical-align: -0.18em; margin-right: 3px; }
+
         /* 게임 화면 UI */
         .topic-title { font-size: 18px; margin-bottom: 4px; }
         .description-box {
@@ -593,7 +596,7 @@
         <p class="subtitle" id="topic-intro-sub"></p>
         <button class="home-btn" onclick="openLearnSlides()">📖 개념 배우기</button>
         <button class="home-btn" onclick="startIntroQuiz()">✏️ 퀴즈 풀기</button>
-        <button class="home-btn" id="topic-intro-leveltest-btn" style="display:none" onclick="startLevelTest()">🎮 레벨테스트</button>
+        <button class="home-btn" id="topic-intro-leveltest-btn" style="display:none" onclick="startLevelTest()"><svg class="icon-goboard" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="20" height="20" rx="3" fill="#dcb35c" stroke="#8a5a1e" stroke-width="1.5"/><path d="M2 9h20M2 15h20M9 2v20M15 2v20" stroke="#8a5a1e" stroke-width="1" opacity="0.85"/><circle cx="9" cy="9" r="3.4" fill="#2b2b2b"/><circle cx="15" cy="15" r="3.4" fill="#fdfdfd" stroke="#9c9c9c" stroke-width="0.8"/></svg> 레벨테스트</button>
         <button class="btn btn-back" onclick="backToTopicList()">◀ 주제 목록으로</button>
     </div>
 </div>
@@ -669,7 +672,7 @@
 <!-- 바둑 게임 해보기: 모드 선택 -->
 <div id="screen-play-menu" class="screen">
     <div class="container">
-        <h2>🎮 바둑 게임 해보기</h2>
+        <h2><svg class="icon-goboard" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="20" height="20" rx="3" fill="#dcb35c" stroke="#8a5a1e" stroke-width="1.5"/><path d="M2 9h20M2 15h20M9 2v20M15 2v20" stroke="#8a5a1e" stroke-width="1" opacity="0.85"/><circle cx="9" cy="9" r="3.4" fill="#2b2b2b"/><circle cx="15" cy="15" r="3.4" fill="#fdfdfd" stroke="#9c9c9c" stroke-width="0.8"/></svg> 바둑 게임 해보기</h2>
         <p class="subtitle">어떻게 대국할지 골라보세요!</p>
         <button class="home-btn" onclick="openOfflineSetup()">🧑‍🤝‍🧑 오프라인으로 같이 두기</button>
         <button class="home-btn" onclick="openAiSetup()">🤖 AI와 대국하기</button>
@@ -782,6 +785,10 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
+
+    // 바둑판+돌 모양 아이콘 (게임기 이모지 🎮 대신 쓴다). JS 템플릿 문자열에 끼워넣을 때 이 상수를 쓴다 -
+    // 정적 HTML 버튼 라벨에는 같은 마크업을 직접 붙여넣었다.
+    const GOBOARD_ICON_SVG = '<svg class="icon-goboard" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="20" height="20" rx="3" fill="#dcb35c" stroke="#8a5a1e" stroke-width="1.5"/><path d="M2 9h20M2 15h20M9 2v20M15 2v20" stroke="#8a5a1e" stroke-width="1" opacity="0.85"/><circle cx="9" cy="9" r="3.4" fill="#2b2b2b"/><circle cx="15" cy="15" r="3.4" fill="#fdfdfd" stroke="#9c9c9c" stroke-width="0.8"/></svg>';
 
     let currentUser = null;
     let profile = { characters: [], activeCharacterId: null };
@@ -941,7 +948,7 @@
     function renderAuthBar() {
         const bar = document.getElementById('auth-bar');
         if (bar) {
-            bar.innerHTML = `<button class="home-btn play-entry-btn" onclick="openPlayMenu()">🎮 바둑 게임 해보기</button>`;
+            bar.innerHTML = `<button class="home-btn play-entry-btn" onclick="openPlayMenu()">${GOBOARD_ICON_SVG} 바둑 게임 해보기</button>`;
         }
         renderTopBarAccount();
     }
@@ -2612,7 +2619,7 @@
             btn.className = 'topic-btn' + (locked ? ' locked' : '');
             let lockIcon = locked ? '🔒 ' : '';
             let badge = fullyCleared ? '<span class="level-badge">✅ 클리어</span>'
-                : (t.levelTest && isCleared && !levelTestWon) ? '<span class="level-badge">🎮 레벨테스트 도전 가능</span>' : '';
+                : (t.levelTest && isCleared && !levelTestWon) ? `<span class="level-badge">${GOBOARD_ICON_SVG} 레벨테스트 도전 가능</span>` : '';
 
             let progressLine;
             if (!hasCharacter) {
@@ -3483,7 +3490,7 @@
         const label = playMode === 'ai'
             ? `🤖 AI (${AI_DIFFICULTY_LABEL[playAiDifficulty] || ''})`
             : playMode === 'leveltest'
-            ? `🎮 레벨테스트 백돌 (남은 기회 ${levelTestMovesLeft}수)`
+            ? `${GOBOARD_ICON_SVG} 레벨테스트 백돌 (남은 기회 ${levelTestMovesLeft}수)`
             : `🧑‍🤝‍🧑 ${playOpponentName}`;
         opponentBar.innerHTML = `
             <div class="op-info">${label}</div>
