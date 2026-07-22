@@ -2693,6 +2693,81 @@
         }
     ];
 
+    // Lv.6 실전 퀴즈 13문제 - Lv.5와 같은 "활로 2개짜리 백돌을 열린 쪽에서 공격해 활로가 적은
+    // 쪽으로 몰아야 한다"는 원리이지만, Lv.5(가운데 미리 놓인 흑돌 하나가 막는 방향을 결정)와
+    // 달리 여기서는 실제 "판의 가장자리/구석"이 그 막힌 방향 역할을 한다 - 그래서 이름 그대로
+    // "구석으로 몰자"를 문제로도 그대로 체감하게 된다. 세 가지 모양을 회전·대칭·위치를 바꿔가며
+    // 섞었다: (1) 돌 1개짜리(3문제), (2) 세로 2개(3문제), (3) 세로 3개(3문제), (4) 꺾인 모양
+    // 4개 무리(4문제). 전부 스크립트로 "열린 쪽을 공격하면(attack) 백돌이 가장자리로 도망가도
+    // 활로가 더 적고, 반대로 가장자리 쪽을 먼저 막으면(flee) 백돌이 오히려 넓은 쪽으로 도망가
+    // 활로가 더 많이 남는다"를 검증했다.
+    const LV6_QUIZ_CONFIGS = [
+        { shape: 'single', black: [[1,2],[1,4]], white: [], targets: [[1,3]], attack: [2,3], flee: [0,3], fledLibsGoodPoints: [[0,2],[0,4]], fledLibsBadPoints: [[3,3],[2,2],[2,4]] },
+        { shape: 'single', black: [[7,2],[7,0]], white: [], targets: [[7,1]], attack: [6,1], flee: [8,1], fledLibsGoodPoints: [[8,0],[8,2]], fledLibsBadPoints: [[5,1],[6,0],[6,2]] },
+        { shape: 'single', black: [[4,1],[6,1]], white: [], targets: [[5,1]], attack: [5,2], flee: [5,0], fledLibsGoodPoints: [[4,0],[6,0]], fledLibsBadPoints: [[4,2],[6,2],[5,3]] },
+        { shape: 'column2', black: [[2,2],[2,4],[1,2],[1,4]], white: [], targets: [[2,3],[1,3]], attack: [3,3], flee: [0,3], fledLibsGoodPoints: [[0,2],[0,4]], fledLibsBadPoints: [[4,3],[3,2],[3,4]] },
+        { shape: 'column2', black: [[6,0],[6,2],[7,0],[7,2]], white: [], targets: [[6,1],[7,1]], attack: [5,1], flee: [8,1], fledLibsGoodPoints: [[8,0],[8,2]], fledLibsBadPoints: [[4,1],[5,0],[5,2]] },
+        { shape: 'column2', black: [[6,6],[4,6],[6,7],[4,7]], white: [], targets: [[5,6],[5,7]], attack: [5,5], flee: [5,8], fledLibsGoodPoints: [[4,8],[6,8]], fledLibsBadPoints: [[4,5],[6,5],[5,4]] },
+        { shape: 'column3', black: [[4,3],[2,3],[4,2],[2,2],[4,1],[2,1]], white: [], targets: [[3,3],[3,2],[3,1]], attack: [3,4], flee: [3,0], fledLibsGoodPoints: [[2,0],[4,0]], fledLibsBadPoints: [[2,4],[4,4],[3,5]] },
+        { shape: 'column3', black: [[2,5],[0,5],[2,6],[0,6],[2,7],[0,7]], white: [], targets: [[1,5],[1,6],[1,7]], attack: [1,4], flee: [1,8], fledLibsGoodPoints: [[0,8],[2,8]], fledLibsBadPoints: [[0,4],[2,4],[1,3]] },
+        { shape: 'column3', black: [[3,6],[3,4],[2,6],[2,4],[1,6],[1,4]], white: [], targets: [[3,5],[2,5],[1,5]], attack: [4,5], flee: [0,5], fledLibsGoodPoints: [[0,4],[0,6]], fledLibsBadPoints: [[5,5],[4,4],[4,6]] },
+        { shape: 'hook', black: [[2,5],[2,3],[1,5],[0,4],[1,2]], white: [], targets: [[2,4],[1,4],[1,3]], attack: [3,4], flee: [0,3], fledLibsGoodPoints: [[0,2]], fledLibsBadPoints: [[4,4],[3,3],[3,5]] },
+        { shape: 'hook', black: [[6,3],[6,1],[7,3],[8,2],[7,0]], white: [], targets: [[6,2],[7,2],[7,1]], attack: [5,2], flee: [8,1], fledLibsGoodPoints: [[8,0]], fledLibsBadPoints: [[4,2],[5,1],[5,3]] },
+        { shape: 'hook', black: [[6,2],[4,2],[6,1],[5,0],[3,1]], white: [], targets: [[5,2],[5,1],[4,1]], attack: [5,3], flee: [4,0], fledLibsGoodPoints: [[3,0]], fledLibsBadPoints: [[4,3],[6,3],[5,4]] },
+        { shape: 'hook', black: [[5,6],[3,6],[5,7],[4,8],[2,7]], white: [], targets: [[4,6],[4,7],[3,7]], attack: [4,5], flee: [3,8], fledLibsGoodPoints: [[2,8]], fledLibsBadPoints: [[3,5],[5,5],[4,4]] }
+    ];
+
+    // Lv.5와 완전히 같은 방식(완전 무작위 섞기 후 같은 모양이 연속되면 재시도)으로, 매 시도마다
+    // 새로 섞는다.
+    let lv6ShuffledConfigs = LV6_QUIZ_CONFIGS.slice();
+    function resetLv6QuizOrder() {
+        for (let attempt = 0; attempt < 200; attempt++) {
+            const candidate = shuffle(LV6_QUIZ_CONFIGS.slice());
+            let hasAdjacentSameShape = false;
+            for (let i = 1; i < candidate.length; i++) {
+                if (candidate[i].shape === candidate[i - 1].shape) { hasAdjacentSameShape = true; break; }
+            }
+            if (!hasAdjacentSameShape) { lv6ShuffledConfigs = candidate; return; }
+        }
+        lv6ShuffledConfigs = LV6_QUIZ_CONFIGS.slice();
+    }
+
+    function buildLv6QuizProblem(cfg) {
+        return {
+            type: 'play_single',
+            blackStones: cfg.black.map(lv5Pt),
+            whiteStones: [...cfg.white.map(lv5Pt), ...cfg.targets.map(lv5Pt)],
+            answers: [lv5Pt(cfg.attack)],
+            desc: '활로가 2개인 흰 돌 무리예요. 활로가 더 적어지는 쪽(가장자리 방향)을 공격해서 단수쳐 보세요!',
+            explainSlides: buildLv6ExplainSlides(cfg)
+        };
+    }
+
+    function buildLv6ExplainSlides(cfg) {
+        const black = cfg.black.map(lv5Pt), white = cfg.white.map(lv5Pt);
+        const targets = cfg.targets.map(lv5Pt), attack = lv5Pt(cfg.attack), flee = lv5Pt(cfg.flee);
+        return [
+            {
+                title: '정답 확인: 여기를 공격해요',
+                desc: '이 자리를 막으면 백돌은 활로가 적어지는 가장자리 쪽으로 도망칠 수밖에 없어요.',
+                blackStones: [...black, attack], whiteStones: [...white, ...targets],
+                lastMove: attack
+            },
+            {
+                title: '백돌이 도망가도 활로가 더 적어요',
+                desc: `백돌이 유일한 활로로 도망가도 활로가 ${cfg.fledLibsGoodPoints.length}개뿐이라 잡기 쉬워요.`,
+                blackStones: [...black, attack], whiteStones: [...white, ...targets, flee],
+                lastMove: flee, highlights: cfg.fledLibsGoodPoints.map(lv5Pt)
+            },
+            {
+                title: '만약 반대쪽을 공격했다면?',
+                desc: `가장자리 쪽을 먼저 막았다면 백돌은 활로가 ${cfg.fledLibsBadPoints.length}개나 남는 열린 쪽으로 도망가서 잡기 훨씬 어려워졌을 거예요. 그래서 열린 쪽부터 막는 게 중요해요!`,
+                blackStones: [...black, flee], whiteStones: [...white, ...targets, attack],
+                lastMove: attack, highlights: cfg.fledLibsBadPoints.map(lv5Pt)
+            }
+        ];
+    }
+
     // Lv.5-3 "역습을 조심하자" 개념 슬라이드용 판. 서로 독립된 두 예시를 비교한다 - 둘 다
     // "흑돌이 백돌을 단수치고, 백돌이 유일한 활로로 도망간다"는 같은 동작이지만 결과가 다르다.
     // 예시A: 흑돌 활로가 2개뿐이고 그중 하나가 백돌의 도망갈 자리와 겹쳐서, 백돌이 도망가면
@@ -2852,7 +2927,18 @@
               moveLimit: 12
           } },
         { key: 'atariattack2', title: '[Lv. 6] 구석으로 몰자', sub: '활로가 적어지는 쪽으로 몰아서 잡아요',
-          learnSlides: ATARIATTACK2_LEARN_SLIDES, tiers: [() => genAtari(2)], counts: [5] },
+          learnSlides: ATARIATTACK2_LEARN_SLIDES, strictMode: true,
+          tiers: LV6_QUIZ_CONFIGS.map((_, i) => () => buildLv6QuizProblem(lv6ShuffledConfigs[i])),
+          counts: LV6_QUIZ_CONFIGS.map(() => 1),
+          // 레벨테스트: Lv.5와 같은 구조지만 여기서는 미리 놓인 흑돌이 아니라 판의 실제 구석이
+          // 백돌을 가두는 벽 역할을 한다. (3,4)를 먼저 막으면 백이 왼쪽 위 구석으로 몰려 2수 만에
+          // 잡히고, (0,3)을 먼저 막으면 백이 오른쪽 아래 넓은 공간으로 도망쳐 살아남는다.
+          levelTest: {
+              black: [[2, 5], [2, 3], [1, 5], [0, 4], [1, 2]],
+              white: [[2, 4], [1, 4], [1, 3]],
+              desc: '이 백돌 3개를 끝까지 몰아서 잡아보세요!',
+              moveLimit: 15
+          } },
         { key: 'atariattack3', title: '[Lv. 7] 역습을 조심하자', sub: '공격하기 전에 내 돌도 안전한지 확인해요',
           learnSlides: ATARIATTACK3_LEARN_SLIDES, tiers: [
               () => {
@@ -2994,6 +3080,7 @@
         currentTopicKey = topicKey;
         let topic = TOPICS.find(t => t.key === topicKey);
         if (topicKey === 'atariattack1') resetLv5QuizOrder(); // 매 시도마다 모양별 순서를 새로 섞는다
+        if (topicKey === 'atariattack2') resetLv6QuizOrder();
         problemsList = generateTopicSet(topic.tiers, topic.counts);
         currentProblemIndex = 0;
         totalScore = 0;
