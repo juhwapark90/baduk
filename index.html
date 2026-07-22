@@ -1122,8 +1122,12 @@
     // 살 때마다 실제로 부모님께 하나씩 요청하는 소모성 구매다 - 그래서 owned/equipped가 아니라
     // character.rewardPurchaseCounts(아이템별 구매 횟수)로 따로 관리한다.
     const REWARD_ITEMS = [
-        { id: 'reward_daiso1000', name: '다이소 1000원 상품권', icon: '🎁', price: 5,
-          parentMsg: '실제 다이소 1000원 상품권으로 바꿔주세요!' }
+        { id: 'reward_daiso1000', name: '다이소 1000원 상품권', icon: '🎁', price: 300,
+          parentMsg: '실제 다이소 1000원 상품권으로 바꿔주세요!' },
+        { id: 'reward_daiso2000', name: '다이소 2000원 상품권', icon: '🎁', price: 500,
+          parentMsg: '실제 다이소 2000원 상품권으로 바꿔주세요!' },
+        { id: 'reward_daiso3000', name: '다이소 3000원 상품권', icon: '🎁', price: 700,
+          parentMsg: '실제 다이소 3000원 상품권으로 바꿔주세요!' }
     ];
 
     function rewardSpentPoints(character) {
