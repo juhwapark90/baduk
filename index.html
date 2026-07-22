@@ -1419,7 +1419,7 @@
             const canBuy = balance >= item.price;
             // 아직 공유 안 한 구매가 있으면, 포인트가 있든 없든 "구매하기" 대신 "공유하기"만 보여준다 -
             // 공유를 안 하고 닫았을 때 다시 그 화면으로 들어갈 수 있는 유일한 통로다.
-            const btnLabel = pendingShare ? '💬 공유하기' : (canBuy ? `구매 (${item.price}P)` : '포인트 부족');
+            const btnLabel = pendingShare ? '💬 공유하기' : (canBuy ? `구매 (${item.price}P)` : `포인트 부족 (${item.price}P)`);
             const btnDisabled = !pendingShare && !canBuy;
             card.innerHTML = `
                 <div class="shop-reward-icon">${item.icon}</div>
@@ -1463,7 +1463,7 @@
                     btnLabel = `구매 (${item.price}P)`;
                     btnAction = () => buyItem(item);
                 } else {
-                    btnLabel = '포인트 부족';
+                    btnLabel = `포인트 부족 (${item.price}P)`;
                     btnDisabled = true;
                 }
                 const previewOptions = buildAvatarOptions(character, { equipped: Object.assign({}, character.equipped, { [slot]: item.id }) });
