@@ -2900,23 +2900,49 @@
     ];
 
     // Lv.7 미니테스트 10문제 - 클릭 한 번으로 채점하는 일반 퀴즈가 아니라, 10문제 전부를
-    // 레벨테스트와 똑같은 실전 대국형 미니게임으로 만든다. 각 문제는 진짜 대각선 지그재그
-    // 축(코너 흑돌 2점 + 도망 대각선 지지대 1점, 백돌 1점)이고, both-branches 사다리 솔버로
+    // 레벨테스트와 똑같은 실전 대국형 미니게임으로 만든다. both-branches 사다리 솔버로
     // "9x9 판 안에서 실제로 끝까지 잡히는지, 최소 몇 수가 필요한지"까지 전부 시뮬레이션해서
-    // 검증했다. 판 전체에 골고루 퍼진 10개 위치(다른 시작점/난이도)를 골랐고, moveLimit은
-    // 검증된 최소 흑 착수 수(blackMoveCount)에 여유 2수를 더한 값이다.
+    // 검증했다. moveLimit은 검증된 최소 흑 착수 수(blackMoveCount)에 여유 2수를 더한 값이다.
+    // 두 가지 서로 다른 시작 모양(shape)을 섞었다 - 전부 'single'(백돌 1개 + 코너 흑돌 2개 +
+    // 대각선 지지대 1개) 하나만 쓰면 위치만 다를 뿐 다 똑같아 보인다는 피드백을 받아서,
+    // 'domino'(백돌 2개가 붙어서 시작 + 사방을 흑돌 4개가 감싼 모양) 템플릿을 새로 찾아
+    // 절반씩 섞었다 - resetLv7MiniTestOrder()가 두 shape가 연속으로 나오지 않게 섞는다.
     const LV7_MINITEST_CONFIGS = [
-        { black: [[1,3],[2,4],[2,1]], white: [[2,3]], moveLimit: 7 },
-        { black: [[4,2],[5,1],[7,2]], white: [[5,2]], moveLimit: 7 },
-        { black: [[1,5],[2,4],[2,7]], white: [[2,5]], moveLimit: 7 },
-        { black: [[4,5],[5,4],[4,6]], white: [[5,5]], moveLimit: 8 },
-        { black: [[3,3],[4,2],[3,4]], white: [[4,3]], moveLimit: 11 },
-        { black: [[3,5],[4,4],[5,4]], white: [[4,5]], moveLimit: 9 },
-        { black: [[2,4],[3,3],[3,6]], white: [[3,4]], moveLimit: 9 },
-        { black: [[4,4],[5,3],[4,5]], white: [[5,4]], moveLimit: 9 },
-        { black: [[4,2],[3,1],[1,2]], white: [[3,2]], moveLimit: 7 },
-        { black: [[4,6],[3,5],[1,6]], white: [[3,6]], moveLimit: 7 }
+        { shape: 'single', black: [[1,3],[2,4],[2,1]], white: [[2,3]], moveLimit: 7 },
+        { shape: 'single', black: [[4,2],[5,1],[7,2]], white: [[5,2]], moveLimit: 7 },
+        { shape: 'single', black: [[1,5],[2,4],[2,7]], white: [[2,5]], moveLimit: 7 },
+        { shape: 'single', black: [[4,5],[5,4],[4,6]], white: [[5,5]], moveLimit: 8 },
+        { shape: 'single', black: [[3,3],[4,2],[3,4]], white: [[4,3]], moveLimit: 11 },
+        { shape: 'domino', black: [[3,1],[4,2],[3,3],[2,3]], white: [[2,2],[3,2]], moveLimit: 6 },
+        { shape: 'domino', black: [[5,5],[6,5],[7,6],[5,7]], white: [[5,6],[6,6]], moveLimit: 6 },
+        { shape: 'domino', black: [[2,4],[3,4],[4,5],[3,6]], white: [[2,5],[3,5]], moveLimit: 7 },
+        { shape: 'domino', black: [[4,3],[5,4],[4,5],[3,5]], white: [[3,4],[4,4]], moveLimit: 9 },
+        { shape: 'domino', black: [[5,4],[6,5],[5,6],[4,6]], white: [[4,5],[5,5]], moveLimit: 11 }
     ];
+
+    // 'single' 5개 + 'domino' 5개, 딱 반반이라 무작위 셔플 후 재시도하는 방식(Lv.5/6 퀴즈처럼)은
+    // 비효율적이다 - 인접 중복이 없는 배치가 정확히 2가지(완전 교대)뿐이라 200번 재시도해도
+    // 못 찾는 경우가 잦았다(직접 시뮬레이션으로 확인). 대신 "남은 개수가 가장 많은 모양을
+    // 우선 배치"하는 결정적 그리디 방식을 쓴다 - 배치 가능한 경우 항상 성공이 보장된다.
+    let lv7ShuffledMiniTests = LV7_MINITEST_CONFIGS.slice();
+    function resetLv7MiniTestOrder() {
+        const groups = {};
+        LV7_MINITEST_CONFIGS.forEach(cfg => { (groups[cfg.shape] = groups[cfg.shape] || []).push(cfg); });
+        Object.keys(groups).forEach(k => { groups[k] = shuffle(groups[k].slice()); });
+        const result = [];
+        let lastShape = null;
+        for (let step = 0; step < LV7_MINITEST_CONFIGS.length; step++) {
+            const remaining = Object.keys(groups).filter(k => groups[k].length > 0);
+            const nonRepeat = remaining.filter(k => k !== lastShape);
+            const pool = nonRepeat.length > 0 ? nonRepeat : remaining; // 불가피할 때만 같은 모양 반복 허용
+            const maxCount = Math.max(...pool.map(k => groups[k].length));
+            const best = pool.filter(k => groups[k].length === maxCount);
+            const pick = best[randInt(0, best.length - 1)];
+            result.push(groups[pick].shift());
+            lastShape = pick;
+        }
+        lv7ShuffledMiniTests = result;
+    }
 
     const TOPICS = [
         { key: 'catchbasics', title: '[Lv. 1] 돌 잡아먹기', sub: '단수된 돌을 잡는 원리를 배우고 연습해요',
@@ -3869,7 +3895,8 @@
     function beginMiniTestQuiz(topicKey) {
         currentTopicKey = topicKey;
         const topic = TOPICS.find(t => t.key === topicKey);
-        miniTestList = shuffle(topic.miniTests.slice());
+        if (topicKey === 'atariattack3') resetLv7MiniTestOrder(); // 'single'/'domino' 모양이 연속으로 나오지 않게 섞는다
+        miniTestList = topicKey === 'atariattack3' ? lv7ShuffledMiniTests : shuffle(topic.miniTests.slice());
         miniTestIndex = 0;
         totalScore = 0;
         quizResults = [];
