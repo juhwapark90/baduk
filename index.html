@@ -2774,120 +2774,140 @@
         ];
     }
 
-    // Lv.7 "축(사다리)" 개념 슬라이드용 판. 활로 2개짜리 백돌 하나를 지그재그(대각선)로 계속
-    // 몰아가면 결국 구석에 갇혀 통째로 잡힌다는 "축(사다리)" 기술과, 도망가는 대각선 길목에
-    // 상대 돌이 미리 있으면 그 돌과 이어지면서 오히려 활로가 늘어나 축이 실패하는 "축머리"를
-    // 함께 가르친다. 순수 흑돌 2개(코너 벽)만으로는 첫 수 이후 바로 활로가 3개로 늘어나며
-    // 축이 실패한다는 걸(단순한 코너 모양은 축이 아니다) 스크립트로 직접 확인했고, 그래서 축이
-    // 실제로 통하려면 도망 대각선에 지지대가 되는 돌이 하나 더 필요하다는 것도 검증했다.
-    // 아래 시퀀스는 전부 스크립트로 매 수 활로를 계산해서 끝까지(포획까지) 검증했다:
-    // black(2,3)->white(1,2)->black(1,3)->white(1,1)->black(0,1)->white(1,0)->black(2,0)
-    // ->(백돌은 남은 자리(0,0)에 두면 자충수라 더 이상 둘 수 없음)->black(0,0)로 4개 전부 포획.
-    const ATARIATTACK3_BASE_BLACK = [{x:3,y:2},{x:2,y:1},{x:0,y:2}];
-    const ATARIATTACK3_WHITE_START = {x:2,y:2};
+    // Lv.7 "축(사다리)" 개념 슬라이드용 판. 이전 버전은 "왼쪽 한 번, 위쪽 두 번"처럼 한쪽으로
+    // 치우쳐서 진짜 지그재그(대각선)처럼 안 보인다는 피드백을 받고 다시 만들었다 - 이번엔 매
+    // 수마다 "위/아래로 한 번 막기 - 옆으로 한 번 막기"가 정확히 번갈아 나오는(대각선 계단
+    // 모양) 진짜 사다리를 스크립트로 직접 찾아서 검증했다(코너 벽 2개 + 대각선 지지대 돌 1개로
+    // 시작, 매 수 활로가 정확히 2 -> 1 -> 2 -> 1...로 이어지며 가장자리까지 8번의 공방 끝에
+    // 통째로 포획됨을 한 수 한 수 확인). 슬라이드가 많아서 처음 2번의 공방만 자세히 보여주고,
+    // 중간은 "계속 이렇게 몰면..."으로 건너뛴 뒤 구석 근처부터 다시 자세히 보여준다.
+    // 전체 수순: black(5,4)->white(4,5)->black(4,6)->white(5,5)->black(6,5)->white(5,6)
+    // ->black(5,7)->white(6,6)->black(7,6)->white(6,7)->black(6,8)->white(7,7)->black(7,8)
+    // ->white(8,7)->black(8,6)->(백돌은 남은 자리(8,8)가 자충수라 더 못 둠)->black(8,8) 포획.
+    const ATARIATTACK3_BASE_BLACK = [{x:3,y:4},{x:4,y:3},{x:3,y:5}];
+    const ATARIATTACK3_WHITE_START = {x:4,y:4};
     const ATARIATTACK3_LEARN_SLIDES = [
         {
             title: '① 지그재그로 몰아가는 "축(사다리)"',
-            desc: '이 백돌은 활로가 2개예요. 한쪽을 막으면 백돌은 나머지 한쪽으로 도망가는데, 계속 이렇게 몰아가면 지그재그로 도망가다 결국 구석에 갇혀서 잡혀요! 이 기술을 "축(사다리)"라고 해요.',
+            desc: '이 백돌은 활로가 2개예요. 한쪽을 막으면 백돌은 나머지 한쪽으로 도망가는데, 계속 이렇게 몰면 대각선으로 지그재그 계단 모양을 그리며 도망가다 결국 가장자리에 갇혀서 잡혀요! 이 기술을 "축(사다리)"라고 해요.',
             blackStones: ATARIATTACK3_BASE_BLACK, whiteStones: [ATARIATTACK3_WHITE_START],
-            highlights: [{x:1,y:2},{x:2,y:3}]
+            highlights: [{x:5,y:4},{x:4,y:5}]
         },
         {
-            title: '② 한쪽을 막았어요',
-            desc: '아래쪽을 막았어요. 백돌은 왼쪽으로만 도망갈 수 있어요.',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}], whiteStones: [ATARIATTACK3_WHITE_START],
-            lastMove: {x:2,y:3}, highlights: [{x:1,y:2}]
+            title: '② 오른쪽을 막았어요',
+            desc: '오른쪽을 막았어요. 백돌은 아래쪽으로만 도망갈 수 있어요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}], whiteStones: [ATARIATTACK3_WHITE_START],
+            lastMove: {x:5,y:4}, highlights: [{x:4,y:5}]
         },
         {
             title: '③ 백돌이 도망갔어요',
-            desc: '백돌이 왼쪽으로 도망갔어요. 활로가 다시 2개(위·아래)로 늘었지만, 아직 지그재그가 계속돼요.',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}], whiteStones: [ATARIATTACK3_WHITE_START, {x:1,y:2}],
-            lastMove: {x:1,y:2}, highlights: [{x:1,y:1},{x:1,y:3}]
+            desc: '백돌이 아래로 도망갔어요. 활로가 다시 2개(아래·오른쪽)가 됐어요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}], whiteStones: [ATARIATTACK3_WHITE_START, {x:4,y:5}],
+            lastMove: {x:4,y:5}, highlights: [{x:5,y:5},{x:4,y:6}]
         },
         {
-            title: '④ 계속 몰아요',
-            desc: '아래쪽을 또 막았어요.',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}, {x:1,y:3}], whiteStones: [ATARIATTACK3_WHITE_START, {x:1,y:2}],
-            lastMove: {x:1,y:3}, highlights: [{x:1,y:1}]
+            title: '④ 이번엔 아래쪽을 막아요',
+            desc: '이번엔 방향을 바꿔서 아래쪽을 막았어요 - 계속 같은 쪽만 막는 게 아니라 번갈아 막는 게 핵심이에요!',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}, {x:4,y:6}], whiteStones: [ATARIATTACK3_WHITE_START, {x:4,y:5}],
+            lastMove: {x:4,y:6}, highlights: [{x:5,y:5}]
         },
         {
-            title: '⑤ 또 도망가요',
-            desc: '백돌이 위쪽으로 도망갔어요.',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}, {x:1,y:3}], whiteStones: [ATARIATTACK3_WHITE_START, {x:1,y:2}, {x:1,y:1}],
-            lastMove: {x:1,y:1}, highlights: [{x:0,y:1},{x:1,y:0}]
+            title: '⑤ 대각선 계단 모양이 보이나요?',
+            desc: '백돌이 오른쪽 아래로 도망갔어요. (4,4)→(4,5)→(5,5)로 이어지는 대각선 계단 모양이 만들어지고 있어요. 이게 바로 "지그재그"예요!',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}, {x:4,y:6}], whiteStones: [ATARIATTACK3_WHITE_START, {x:4,y:5}, {x:5,y:5}],
+            lastMove: {x:5,y:5}, highlights: [{x:6,y:5},{x:5,y:6}]
         },
         {
-            title: '⑥ 끝까지 몰아요',
-            desc: '왼쪽을 막았어요.',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}, {x:1,y:3}, {x:0,y:1}], whiteStones: [ATARIATTACK3_WHITE_START, {x:1,y:2}, {x:1,y:1}],
-            lastMove: {x:0,y:1}, highlights: [{x:1,y:0}]
+            title: '⑥ 같은 방법으로 계속 몰면...',
+            desc: '오른쪽 막기 → 도망 → 아래쪽 막기 → 도망을 계속 번갈아 반복했어요. 대각선 계단이 점점 길어지면서 백돌이 가장자리 쪽으로 몰리고 있어요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}, {x:4,y:6}, {x:6,y:5}, {x:5,y:7}, {x:7,y:6}],
+            whiteStones: [ATARIATTACK3_WHITE_START, {x:4,y:5}, {x:5,y:5}, {x:5,y:6}, {x:6,y:6}, {x:6,y:7}],
+            lastMove: {x:6,y:7}, highlights: [{x:7,y:7},{x:6,y:8}]
         },
         {
-            title: '⑦ 구석 바로 앞까지 몰렸어요',
-            desc: '백돌이 위쪽 가장자리로 도망갔어요. 이제 구석까지 거의 다 왔어요!',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}, {x:1,y:3}, {x:0,y:1}], whiteStones: [ATARIATTACK3_WHITE_START, {x:1,y:2}, {x:1,y:1}, {x:1,y:0}],
-            lastMove: {x:1,y:0}, highlights: [{x:0,y:0},{x:2,y:0}]
+            title: '⑦ 구석 가까이 몰렸어요',
+            desc: '아래쪽을 막았어요. 백돌은 오른쪽으로만 도망갈 수 있어요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}, {x:4,y:6}, {x:6,y:5}, {x:5,y:7}, {x:7,y:6}, {x:6,y:8}],
+            whiteStones: [ATARIATTACK3_WHITE_START, {x:4,y:5}, {x:5,y:5}, {x:5,y:6}, {x:6,y:6}, {x:6,y:7}],
+            lastMove: {x:6,y:8}, highlights: [{x:7,y:7}]
         },
         {
-            title: '⑧ 활로 하나를 마저 막아요',
-            desc: '오른쪽을 막았어요. 이제 남은 자리(왼쪽 위 구석)에 백돌이 두면 오히려 자기 활로가 0(자충수)이 되어서, 백돌은 그 자리에 둘 수조차 없어요! 더 이상 도망갈 방법이 없어요.',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}, {x:1,y:3}, {x:0,y:1}, {x:2,y:0}], whiteStones: [ATARIATTACK3_WHITE_START, {x:1,y:2}, {x:1,y:1}, {x:1,y:0}],
-            lastMove: {x:2,y:0}, highlights: [{x:0,y:0}]
+            title: '⑧ 판 끝(가장자리)까지 왔어요',
+            desc: '백돌이 판 가장자리 바로 앞까지 도망갔어요. 활로가 2개(아래·오른쪽)예요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}, {x:4,y:6}, {x:6,y:5}, {x:5,y:7}, {x:7,y:6}, {x:6,y:8}],
+            whiteStones: [ATARIATTACK3_WHITE_START, {x:4,y:5}, {x:5,y:5}, {x:5,y:6}, {x:6,y:6}, {x:6,y:7}, {x:7,y:7}],
+            lastMove: {x:7,y:7}, highlights: [{x:8,y:7},{x:7,y:8}]
         },
         {
-            title: '⑨ 결국 다 잡혀요!',
-            desc: '마지막 자리를 막으면 백돌 4개가 통째로 잡혀요! 이렇게 지그재그로 계속 몰아가는 게 "축(사다리)"예요.',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}, {x:1,y:3}, {x:0,y:1}, {x:2,y:0}, {x:0,y:0}], whiteStones: [],
-            lastMove: {x:0,y:0}, xmarks: [ATARIATTACK3_WHITE_START, {x:1,y:2}, {x:1,y:1}, {x:1,y:0}]
+            title: '⑨ 활로가 딱 1개 남았어요',
+            desc: '아래쪽을 막으니 백돌은 판 끝(가장자리)으로 도망갈 수밖에 없어요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}, {x:4,y:6}, {x:6,y:5}, {x:5,y:7}, {x:7,y:6}, {x:6,y:8}, {x:7,y:8}],
+            whiteStones: [ATARIATTACK3_WHITE_START, {x:4,y:5}, {x:5,y:5}, {x:5,y:6}, {x:6,y:6}, {x:6,y:7}, {x:7,y:7}],
+            lastMove: {x:7,y:8}, highlights: [{x:8,y:7}]
         },
         {
-            title: '⑩ 그런데 조심! "축머리"가 있다면?',
-            desc: '이번엔 도망가는 길목(위쪽 대각선)에 백돌이 미리 하나 놓여 있어요. 이런 돌을 "축머리"라고 해요. 아까와 똑같이 몰아볼까요?',
-            blackStones: ATARIATTACK3_BASE_BLACK, whiteStones: [ATARIATTACK3_WHITE_START, {x:1,y:1}],
-            highlights: [{x:1,y:2},{x:2,y:3}]
+            title: '⑩ 활로 하나를 마저 막아요',
+            desc: '백돌이 판 가장자리(x=8)까지 도망갔어요. 활로가 2개(위·아래) 남았는데, 위쪽을 막았어요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}, {x:4,y:6}, {x:6,y:5}, {x:5,y:7}, {x:7,y:6}, {x:6,y:8}, {x:7,y:8}, {x:8,y:6}],
+            whiteStones: [ATARIATTACK3_WHITE_START, {x:4,y:5}, {x:5,y:5}, {x:5,y:6}, {x:6,y:6}, {x:6,y:7}, {x:7,y:7}, {x:8,y:7}],
+            lastMove: {x:8,y:6}, highlights: [{x:8,y:8}]
         },
         {
-            title: '⑪ 아까와 똑같이 막았어요',
-            desc: '아까와 똑같이 아래쪽을 막았어요.',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}], whiteStones: [ATARIATTACK3_WHITE_START, {x:1,y:1}],
-            lastMove: {x:2,y:3}, highlights: [{x:1,y:2}]
+            title: '⑪ 결국 다 잡혀요!',
+            desc: '이제 남은 자리(8,8)는 판 맨 구석이라, 백돌이 두면 오히려 자기 활로가 0(자충수)이 돼서 그 자리에 둘 수조차 없어요! 마지막 활로를 막으면 백돌 8개가 대각선 모양 그대로 통째로 잡혀요. 이렇게 대각선으로 지그재그 몰아가는 게 "축(사다리)"예요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}, {x:4,y:6}, {x:6,y:5}, {x:5,y:7}, {x:7,y:6}, {x:6,y:8}, {x:7,y:8}, {x:8,y:6}, {x:8,y:8}],
+            whiteStones: [],
+            lastMove: {x:8,y:8}, xmarks: [ATARIATTACK3_WHITE_START, {x:4,y:5}, {x:5,y:5}, {x:5,y:6}, {x:6,y:6}, {x:6,y:7}, {x:7,y:7}, {x:8,y:7}]
         },
         {
-            title: '⑫ 어라, 미리 있던 돌과 이어져요!',
-            desc: '백돌이 도망간 자리가 미리 있던 축머리 돌과 바로 이어지면서, 활로가 3개(위·왼쪽·아래)나 됐어요! 이렇게 축머리가 있으면 축이 통하지 않아요. 그래서 축을 두기 전엔 도망가는 길목에 상대 돌이 있는지 꼭 확인해야 해요!',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}], whiteStones: [ATARIATTACK3_WHITE_START, {x:1,y:1}, {x:1,y:2}],
-            lastMove: {x:1,y:2}, highlights: [{x:1,y:0},{x:0,y:1},{x:1,y:3}]
+            title: '⑫ 그런데 조심! "축머리"가 있다면?',
+            desc: '이번엔 도망가는 대각선 길목에 백돌이 미리 하나(5,5 자리) 놓여 있어요. 이런 돌을 "축머리"라고 해요. 아까와 똑같이 몰아볼까요?',
+            blackStones: ATARIATTACK3_BASE_BLACK, whiteStones: [ATARIATTACK3_WHITE_START, {x:5,y:5}],
+            highlights: [{x:5,y:4},{x:4,y:5}]
+        },
+        {
+            title: '⑬ 아까와 똑같이 오른쪽을 막았어요',
+            desc: '아까와 똑같이 오른쪽을 막았어요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}], whiteStones: [ATARIATTACK3_WHITE_START, {x:5,y:5}],
+            lastMove: {x:5,y:4}, highlights: [{x:4,y:5}]
+        },
+        {
+            title: '⑭ 어라, 미리 있던 돌과 바로 이어져요!',
+            desc: '백돌이 아래로 도망가자마자 미리 있던 축머리 돌(5,5)과 바로 이어지면서, 활로가 3개나 됐어요! 이렇게 축머리가 있으면 축이 통하지 않아요. 그래서 축을 두기 전엔 도망가는 대각선 길목에 상대 돌이 있는지 꼭 확인해야 해요!',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}], whiteStones: [ATARIATTACK3_WHITE_START, {x:5,y:5}, {x:4,y:5}],
+            lastMove: {x:4,y:5}, highlights: [{x:4,y:6},{x:6,y:5},{x:5,y:6}]
         },
         {
             title: '미니퀴즈!!! 🎯',
             desc: '이 백돌에 축을 걸려고 해요. 1과 2 중 어느 쪽을 먼저 막아야 축이 통할까요?',
             blackStones: ATARIATTACK3_BASE_BLACK, whiteStones: [ATARIATTACK3_WHITE_START],
-            labels: [{x:2,y:3,text:'1'},{x:1,y:2,text:'2'}]
+            labels: [{x:5,y:4,text:'1'},{x:4,y:5,text:'2'}]
         },
         {
             title: '정답은 1번이에요! ✅',
-            desc: '1번(아래쪽)을 막아야 백돌이 지그재그로 몰리다가 결국 구석에서 잡혀요. 2번을 먼저 막으면 백돌이 반대로 도망가서 축이 통하지 않아요.',
-            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:2,y:3}], whiteStones: [ATARIATTACK3_WHITE_START],
-            lastMove: {x:2,y:3}
+            desc: '1번(오른쪽)을 막아야 백돌이 대각선으로 지그재그 몰리다가 결국 가장자리에서 잡혀요. 2번을 먼저 막으면 백돌이 반대로 도망가서 축이 통하지 않아요.',
+            blackStones: [...ATARIATTACK3_BASE_BLACK, {x:5,y:4}], whiteStones: [ATARIATTACK3_WHITE_START],
+            lastMove: {x:5,y:4}
         }
     ];
 
-    // Lv.7 실전 퀴즈 10문제 - Lv.5와 완전히 같은 매커니즘(미리 놓인 흑돌 하나가 방향을 결정)을
-    // 그대로 쓴다: 이 흑돌 쪽으로 도망치도록 몰면(attack) 축이 계속 이어지고, 반대로 몰면(flee
-    // 방향을 먼저 막으면) 백돌이 열린 쪽으로 도망쳐 활로가 더 늘어난다. 세 모양(1개짜리 3,
-    // 세로3 3, 꺾인모양 4)을 회전·대칭·위치를 바꿔가며 섞었고, 전부 스크립트로 "공격 방향으로
-    // 몰면 도망가도 활로가 더 적고, 반대 방향이면 활로가 더 많이 남는다"를 검증했다.
+    // Lv.7 실전 퀴즈 10문제 - Lv.5/6과는 다르게, "축이 이미 2번 진행된" 도중 상황을 그대로
+    // 보여주고 그 다음(3번째) 공격 지점을 찾게 한다. 백돌이 이미 지그재그로 2칸 끌려온 3목
+    // 모양이라 한눈에 "쫓기고 있는 사다리"임이 보이고, 이번에도 맞는 방향(activeAttack)으로
+    // 몰면 도망가도 활로가 더 줄고, 반대로 막으면 백이 열린 쪽으로 도망쳐 활로가 늘어난다.
+    // 기본 모양 하나를 8가지 회전·대칭으로, 그리고 위치를 바꾼 변형 2개를 더해 10문제를 만들었고
+    // 전부 스크립트로 "공격 방향으로 몰면 도망가도 활로가 더 적다"를 직접 시뮬레이션해 검증했다.
     const LV7_QUIZ_CONFIGS = [
-        { shape: 'single', black: [[6,4],[6,2],[5,2]], white: [], targets: [[6,3]], attack: [7,3], flee: [5,3], fledLibsGoodPoints: [[4,3],[5,4]], fledLibsBadPoints: [[8,3],[7,2],[7,4]] },
-        { shape: 'single', black: [[2,7],[2,5],[3,5]], white: [], targets: [[2,6]], attack: [1,6], flee: [3,6], fledLibsGoodPoints: [[4,6],[3,7]], fledLibsBadPoints: [[0,6],[1,5],[1,7]] },
-        { shape: 'single', black: [[3,2],[5,2],[5,1],[7,4]], white: [], targets: [[4,2]], attack: [4,3], flee: [4,1], fledLibsGoodPoints: [[3,1],[4,0]], fledLibsBadPoints: [[3,3],[5,3],[4,4]] },
-        { shape: 'column', black: [[5,4],[5,2],[4,4],[4,2],[3,4],[3,2],[2,2]], white: [[8,5]], targets: [[5,3],[4,3],[3,3]], attack: [6,3], flee: [2,3], fledLibsGoodPoints: [[1,3],[2,4]], fledLibsBadPoints: [[7,3],[6,2],[6,4]] },
-        { shape: 'column', black: [[3,6],[3,4],[4,6],[4,4],[5,6],[5,4],[6,4],[6,2]], white: [], targets: [[3,5],[4,5],[5,5]], attack: [2,5], flee: [6,5], fledLibsGoodPoints: [[7,5],[6,6]], fledLibsBadPoints: [[1,5],[2,4],[2,6]] },
-        { shape: 'column', black: [[7,5],[5,5],[7,6],[5,6],[7,7],[5,7],[5,8]], white: [], targets: [[6,5],[6,6],[6,7]], attack: [6,4], flee: [6,8], fledLibsGoodPoints: [[7,8]], fledLibsBadPoints: [[5,4],[7,4],[6,3]] },
-        { shape: 'hook', black: [[6,5],[6,3],[5,5],[4,6],[4,3],[3,5],[3,4],[3,7]], white: [], targets: [[6,4],[5,4],[4,4],[4,5]], attack: [7,4], flee: [5,3], fledLibsGoodPoints: [[5,2]], fledLibsBadPoints: [[8,4],[7,3],[7,5]] },
-        { shape: 'hook', black: [[2,4],[2,2],[3,4],[4,5],[4,2],[5,4],[5,3]], white: [], targets: [[2,3],[3,3],[4,3],[4,4]], attack: [1,3], flee: [3,2], fledLibsGoodPoints: [[3,1]], fledLibsBadPoints: [[0,3],[1,2],[1,4]] },
-        { shape: 'hook', black: [[3,4],[5,4],[3,5],[2,6],[5,6],[3,7],[4,7],[7,7]], white: [], targets: [[4,4],[4,5],[4,6],[3,6]], attack: [4,3], flee: [5,5], fledLibsGoodPoints: [[6,5]], fledLibsBadPoints: [[3,3],[5,3],[4,2]] },
-        { shape: 'hook', black: [[4,5],[6,5],[4,4],[3,3],[6,3],[4,2],[5,2]], white: [[2,7]], targets: [[5,5],[5,4],[5,3],[4,3]], attack: [5,6], flee: [6,4], fledLibsGoodPoints: [[7,4]], fledLibsBadPoints: [[4,6],[6,6],[5,7]] }
+        { shape: 'deg0', black: [[3,4],[4,3],[3,5],[5,4],[4,6]], white: [], targets: [[4,4],[4,5],[5,5]], attack: [6,5], flee: [5,6], fledLibsGoodPoints: [[6,6],[5,7]], fledLibsBadPoints: [[7,5],[6,4],[6,6]] },
+        { shape: 'deg90', black: [[4,2],[5,3],[3,2],[4,4],[2,3]], white: [], targets: [[4,3],[3,3],[3,4]], attack: [3,5], flee: [2,4], fledLibsGoodPoints: [[1,4],[2,5]], fledLibsBadPoints: [[2,5],[4,5],[3,6]] },
+        { shape: 'deg180', black: [[5,4],[4,5],[5,3],[3,4],[4,2]], white: [], targets: [[4,4],[4,3],[3,3]], attack: [2,3], flee: [3,2], fledLibsGoodPoints: [[2,2],[3,1]], fledLibsBadPoints: [[1,3],[2,2],[2,4]] },
+        { shape: 'deg270', black: [[4,6],[3,5],[5,6],[4,4],[6,5]], white: [], targets: [[4,5],[5,5],[5,4]], attack: [5,3], flee: [6,4], fledLibsGoodPoints: [[7,4],[6,3]], fledLibsBadPoints: [[4,3],[6,3],[5,2]] },
+        { shape: 'deg0m', black: [[4,3],[3,2],[4,4],[2,3],[3,5]], white: [], targets: [[3,3],[3,4],[2,4]], attack: [1,4], flee: [2,5], fledLibsGoodPoints: [[1,5],[2,6]], fledLibsBadPoints: [[0,4],[1,3],[1,5]] },
+        { shape: 'deg90m', black: [[5,5],[6,4],[4,5],[5,3],[3,4]], white: [], targets: [[5,4],[4,4],[4,3]], attack: [4,2], flee: [3,3], fledLibsGoodPoints: [[2,3],[3,2]], fledLibsBadPoints: [[3,2],[5,2],[4,1]] },
+        { shape: 'deg180m', black: [[3,3],[4,4],[3,2],[5,3],[4,1]], white: [], targets: [[4,3],[4,2],[5,2]], attack: [6,2], flee: [5,1], fledLibsGoodPoints: [[6,1],[5,0]], fledLibsBadPoints: [[7,2],[6,1],[6,3]] },
+        { shape: 'deg270m', black: [[3,3],[2,4],[4,3],[3,5],[5,4]], white: [], targets: [[3,4],[4,4],[4,5]], attack: [4,6], flee: [5,5], fledLibsGoodPoints: [[6,5],[5,6]], fledLibsBadPoints: [[3,6],[5,6],[4,7]] },
+        { shape: 'deg0b', black: [[1,2],[2,1],[1,3],[3,2],[2,4]], white: [], targets: [[2,2],[2,3],[3,3]], attack: [4,3], flee: [3,4], fledLibsGoodPoints: [[4,4],[3,5]], fledLibsBadPoints: [[5,3],[4,2],[4,4]] },
+        { shape: 'deg180b', black: [[7,6],[6,7],[7,5],[5,6],[6,4]], white: [], targets: [[6,6],[6,5],[5,5]], attack: [4,5], flee: [5,4], fledLibsGoodPoints: [[4,4],[5,3]], fledLibsBadPoints: [[3,5],[4,4],[4,6]] }
     ];
 
     let lv7ShuffledConfigs = LV7_QUIZ_CONFIGS.slice();
@@ -2909,7 +2929,7 @@
             blackStones: cfg.black.map(lv5Pt),
             whiteStones: [...cfg.white.map(lv5Pt), ...cfg.targets.map(lv5Pt)],
             answers: [lv5Pt(cfg.attack)],
-            desc: '활로가 2개인 흰 돌 무리예요. 축이 통하는 쪽(활로가 더 적어지는 쪽)을 공격해서 단수쳐 보세요!',
+            desc: '축으로 이미 몇 걸음 몰린 백돌이에요! 지그재그가 계속 이어지도록 다음 공격 자리를 찾아 단수쳐 보세요!',
             explainSlides: buildLv7ExplainSlides(cfg)
         };
     }
@@ -3012,14 +3032,17 @@
           learnSlides: ATARIATTACK3_LEARN_SLIDES, strictMode: true,
           tiers: LV7_QUIZ_CONFIGS.map((_, i) => () => buildLv7QuizProblem(lv7ShuffledConfigs[i])),
           counts: LV7_QUIZ_CONFIGS.map(() => 1),
-          // 레벨테스트: 개념 슬라이드와 똑같은 배치(구석 벽 + 도망 대각선 지지대)를 실제 대국으로
-          // 다시 확인한다. (2,3)을 먼저 막으면 지그재그로 몰려 4수 만에 통째로 잡히고, (1,2)를
-          // 먼저 막으면 백이 반대로 열린 공간으로 도망쳐 산다.
+          // 레벨테스트: 개념 슬라이드에서 직접 검증한 진짜 대각선 지그재그 축(코너 2점 +
+          // 도망 대각선 지지대 1점)을 그대로 실전 대국으로 재현한다. (5,4)부터 시작해 8번의
+          // 단수-도피가 대각선으로 번갈아 이어지고, 9번째 수(8,8)로 최종 포획한다 - 검증된
+          // 전체 수순: black(5,4)->white(4,5)->black(4,6)->white(5,5)->black(6,5)->white(5,6)
+          // ->black(5,7)->white(6,6)->black(7,6)->white(6,7)->black(6,8)->white(7,7)
+          // ->black(7,8)->white(8,7)->black(8,6)->black(8,8)[포획].
           levelTest: {
-              black: [[3, 2], [2, 1], [0, 2]],
-              white: [[2, 2]],
+              black: [[3, 4], [4, 3], [3, 5]],
+              white: [[4, 4]],
               desc: '이 백돌을 끝까지 몰아서 잡아보세요!',
-              moveLimit: 20
+              moveLimit: 12
           } },
         { key: 'atariattack4', title: '[Lv. 8] 가장자리에 있는 돌 공격하기', sub: '가장자리에 있는 돌을 노려요',
           tiers: [
