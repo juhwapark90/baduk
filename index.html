@@ -612,7 +612,7 @@
         <h2 id="topic-intro-title">주제</h2>
         <p class="subtitle" id="topic-intro-sub"></p>
         <button class="home-btn" onclick="openLearnSlides()">📖 개념 배우기</button>
-        <button class="home-btn" onclick="startIntroQuiz()">✏️ 퀴즈 풀기</button>
+        <button class="home-btn" id="topic-intro-quiz-btn" onclick="startIntroQuiz()">✏️ 퀴즈 풀기</button>
         <button class="home-btn" id="topic-intro-leveltest-btn" style="display:none" onclick="startLevelTest()"><svg class="icon-goboard" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="20" height="20" rx="3" fill="#dcb35c" stroke="#8a5a1e" stroke-width="1.5"/><path d="M2 9h20M2 15h20M9 2v20M15 2v20" stroke="#8a5a1e" stroke-width="1" opacity="0.85"/><circle cx="9" cy="9" r="3.4" fill="#2b2b2b"/><circle cx="15" cy="15" r="3.4" fill="#fdfdfd" stroke="#9c9c9c" stroke-width="0.8"/></svg> 레벨테스트</button>
         <button class="btn btn-back" onclick="backToTopicList()">◀ 주제 목록으로</button>
     </div>
@@ -778,8 +778,9 @@
         <h2>🏁 대국 종료!</h2>
         <div id="play-end-summary"></div>
         <div class="result-btns" style="margin-top:16px;">
-            <button class="home-btn" onclick="playRestartSameGame()">🔄 새 대국</button>
-            <button class="home-btn" onclick="closePlayEndPopup()">확인</button>
+            <button class="home-btn" id="play-end-restart-btn" onclick="playRestartSameGame()">🔄 새 대국</button>
+            <button class="home-btn" id="play-end-confirm-btn" onclick="closePlayEndPopup()">확인</button>
+            <button class="home-btn" id="play-end-continue-btn" style="display:none" onclick="miniTestAdvance()">다음 문제 보기 ▶</button>
         </div>
     </div>
 </div>
@@ -1690,8 +1691,15 @@
     let totalScore = 0;
     let currentMistakes = 0;
     let currentTopicKey = null;
-    let quizResults = [];       // strictMode 퀴즈(Lv.5)의 문제별 채점 결과 { correct: bool } 목록
+    let quizResults = [];       // strictMode 퀴즈(Lv.5)의 문제별 채점 결과 { correct: bool } 목록 - 미니테스트 시리즈도 이걸 같이 쓴다
     let inExplanationMode = false; // screen-learn이 "개념 배우기"가 아니라 문제별 해설 슬라이드로 열렸는지
+
+    // Lv.7부터: "퀴즈"가 곧 10개의 실전 레벨테스트 미니게임 시리즈다. quizResults/totalScore는
+    // 기존 클릭식 퀴즈와 그대로 공유해서, 결과 화면/저장 로직(finishTopicQuiz/saveTopicResult)을
+    // 손대지 않고 재사용한다.
+    let miniTestSeriesActive = false;
+    let miniTestList = [];
+    let miniTestIndex = 0;
 
     /* =========================================================
        공통 유틸리티
@@ -2891,73 +2899,24 @@
         }
     ];
 
-    // Lv.7 실전 퀴즈 10문제 - Lv.5/6과는 다르게, "축이 이미 2번 진행된" 도중 상황을 그대로
-    // 보여주고 그 다음(3번째) 공격 지점을 찾게 한다. 백돌이 이미 지그재그로 2칸 끌려온 3목
-    // 모양이라 한눈에 "쫓기고 있는 사다리"임이 보이고, 이번에도 맞는 방향(activeAttack)으로
-    // 몰면 도망가도 활로가 더 줄고, 반대로 막으면 백이 열린 쪽으로 도망쳐 활로가 늘어난다.
-    // 기본 모양 하나를 8가지 회전·대칭으로, 그리고 위치를 바꾼 변형 2개를 더해 10문제를 만들었고
-    // 전부 스크립트로 "공격 방향으로 몰면 도망가도 활로가 더 적다"를 직접 시뮬레이션해 검증했다.
-    const LV7_QUIZ_CONFIGS = [
-        { shape: 'deg0', black: [[3,4],[4,3],[3,5],[5,4],[4,6]], white: [], targets: [[4,4],[4,5],[5,5]], attack: [6,5], flee: [5,6], fledLibsGoodPoints: [[6,6],[5,7]], fledLibsBadPoints: [[7,5],[6,4],[6,6]] },
-        { shape: 'deg90', black: [[4,2],[5,3],[3,2],[4,4],[2,3]], white: [], targets: [[4,3],[3,3],[3,4]], attack: [3,5], flee: [2,4], fledLibsGoodPoints: [[1,4],[2,5]], fledLibsBadPoints: [[2,5],[4,5],[3,6]] },
-        { shape: 'deg180', black: [[5,4],[4,5],[5,3],[3,4],[4,2]], white: [], targets: [[4,4],[4,3],[3,3]], attack: [2,3], flee: [3,2], fledLibsGoodPoints: [[2,2],[3,1]], fledLibsBadPoints: [[1,3],[2,2],[2,4]] },
-        { shape: 'deg270', black: [[4,6],[3,5],[5,6],[4,4],[6,5]], white: [], targets: [[4,5],[5,5],[5,4]], attack: [5,3], flee: [6,4], fledLibsGoodPoints: [[7,4],[6,3]], fledLibsBadPoints: [[4,3],[6,3],[5,2]] },
-        { shape: 'deg0m', black: [[4,3],[3,2],[4,4],[2,3],[3,5]], white: [], targets: [[3,3],[3,4],[2,4]], attack: [1,4], flee: [2,5], fledLibsGoodPoints: [[1,5],[2,6]], fledLibsBadPoints: [[0,4],[1,3],[1,5]] },
-        { shape: 'deg90m', black: [[5,5],[6,4],[4,5],[5,3],[3,4]], white: [], targets: [[5,4],[4,4],[4,3]], attack: [4,2], flee: [3,3], fledLibsGoodPoints: [[2,3],[3,2]], fledLibsBadPoints: [[3,2],[5,2],[4,1]] },
-        { shape: 'deg180m', black: [[3,3],[4,4],[3,2],[5,3],[4,1]], white: [], targets: [[4,3],[4,2],[5,2]], attack: [6,2], flee: [5,1], fledLibsGoodPoints: [[6,1],[5,0]], fledLibsBadPoints: [[7,2],[6,1],[6,3]] },
-        { shape: 'deg270m', black: [[3,3],[2,4],[4,3],[3,5],[5,4]], white: [], targets: [[3,4],[4,4],[4,5]], attack: [4,6], flee: [5,5], fledLibsGoodPoints: [[6,5],[5,6]], fledLibsBadPoints: [[3,6],[5,6],[4,7]] },
-        { shape: 'deg0b', black: [[1,2],[2,1],[1,3],[3,2],[2,4]], white: [], targets: [[2,2],[2,3],[3,3]], attack: [4,3], flee: [3,4], fledLibsGoodPoints: [[4,4],[3,5]], fledLibsBadPoints: [[5,3],[4,2],[4,4]] },
-        { shape: 'deg180b', black: [[7,6],[6,7],[7,5],[5,6],[6,4]], white: [], targets: [[6,6],[6,5],[5,5]], attack: [4,5], flee: [5,4], fledLibsGoodPoints: [[4,4],[5,3]], fledLibsBadPoints: [[3,5],[4,4],[4,6]] }
+    // Lv.7 미니테스트 10문제 - 클릭 한 번으로 채점하는 일반 퀴즈가 아니라, 10문제 전부를
+    // 레벨테스트와 똑같은 실전 대국형 미니게임으로 만든다. 각 문제는 진짜 대각선 지그재그
+    // 축(코너 흑돌 2점 + 도망 대각선 지지대 1점, 백돌 1점)이고, both-branches 사다리 솔버로
+    // "9x9 판 안에서 실제로 끝까지 잡히는지, 최소 몇 수가 필요한지"까지 전부 시뮬레이션해서
+    // 검증했다. 판 전체에 골고루 퍼진 10개 위치(다른 시작점/난이도)를 골랐고, moveLimit은
+    // 검증된 최소 흑 착수 수(blackMoveCount)에 여유 2수를 더한 값이다.
+    const LV7_MINITEST_CONFIGS = [
+        { black: [[1,3],[2,4],[2,1]], white: [[2,3]], moveLimit: 7 },
+        { black: [[4,2],[5,1],[7,2]], white: [[5,2]], moveLimit: 7 },
+        { black: [[1,5],[2,4],[2,7]], white: [[2,5]], moveLimit: 7 },
+        { black: [[4,5],[5,4],[4,6]], white: [[5,5]], moveLimit: 8 },
+        { black: [[3,3],[4,2],[3,4]], white: [[4,3]], moveLimit: 11 },
+        { black: [[3,5],[4,4],[5,4]], white: [[4,5]], moveLimit: 9 },
+        { black: [[2,4],[3,3],[3,6]], white: [[3,4]], moveLimit: 9 },
+        { black: [[4,4],[5,3],[4,5]], white: [[5,4]], moveLimit: 9 },
+        { black: [[4,2],[3,1],[1,2]], white: [[3,2]], moveLimit: 7 },
+        { black: [[4,6],[3,5],[1,6]], white: [[3,6]], moveLimit: 7 }
     ];
-
-    let lv7ShuffledConfigs = LV7_QUIZ_CONFIGS.slice();
-    function resetLv7QuizOrder() {
-        for (let attempt = 0; attempt < 200; attempt++) {
-            const candidate = shuffle(LV7_QUIZ_CONFIGS.slice());
-            let hasAdjacentSameShape = false;
-            for (let i = 1; i < candidate.length; i++) {
-                if (candidate[i].shape === candidate[i - 1].shape) { hasAdjacentSameShape = true; break; }
-            }
-            if (!hasAdjacentSameShape) { lv7ShuffledConfigs = candidate; return; }
-        }
-        lv7ShuffledConfigs = LV7_QUIZ_CONFIGS.slice();
-    }
-
-    function buildLv7QuizProblem(cfg) {
-        return {
-            type: 'play_single',
-            blackStones: cfg.black.map(lv5Pt),
-            whiteStones: [...cfg.white.map(lv5Pt), ...cfg.targets.map(lv5Pt)],
-            answers: [lv5Pt(cfg.attack)],
-            desc: '축으로 이미 몇 걸음 몰린 백돌이에요! 지그재그가 계속 이어지도록 다음 공격 자리를 찾아 단수쳐 보세요!',
-            explainSlides: buildLv7ExplainSlides(cfg)
-        };
-    }
-
-    function buildLv7ExplainSlides(cfg) {
-        const black = cfg.black.map(lv5Pt), white = cfg.white.map(lv5Pt);
-        const targets = cfg.targets.map(lv5Pt), attack = lv5Pt(cfg.attack), flee = lv5Pt(cfg.flee);
-        return [
-            {
-                title: '정답 확인: 여기를 공격해요',
-                desc: '이 자리를 막으면 축이 통해서, 백돌은 활로가 적어지는 쪽으로 도망칠 수밖에 없어요.',
-                blackStones: [...black, attack], whiteStones: [...white, ...targets],
-                lastMove: attack
-            },
-            {
-                title: '백돌이 도망가도 활로가 더 적어요',
-                desc: `백돌이 유일한 활로로 도망가도 활로가 ${cfg.fledLibsGoodPoints.length}개뿐이라 계속 몰아서 잡기 쉬워요.`,
-                blackStones: [...black, attack], whiteStones: [...white, ...targets, flee],
-                lastMove: flee, highlights: cfg.fledLibsGoodPoints.map(lv5Pt)
-            },
-            {
-                title: '만약 반대쪽을 공격했다면?',
-                desc: `반대쪽을 먼저 막았다면 백돌은 활로가 ${cfg.fledLibsBadPoints.length}개나 남는 열린 쪽으로 도망가서 축이 통하지 않았을 거예요. 그래서 처음에 어느 쪽을 공격하는지가 중요해요!`,
-                blackStones: [...black, flee], whiteStones: [...white, ...targets, attack],
-                lastMove: attack, highlights: cfg.fledLibsBadPoints.map(lv5Pt)
-            }
-        ];
-    }
 
     const TOPICS = [
         { key: 'catchbasics', title: '[Lv. 1] 돌 잡아먹기', sub: '단수된 돌을 잡는 원리를 배우고 연습해요',
@@ -3029,21 +2988,14 @@
               moveLimit: 15
           } },
         { key: 'atariattack3', title: '[Lv. 7] 축(사다리)으로 잡기', sub: '지그재그로 몰아가면 결국 잡혀요',
-          learnSlides: ATARIATTACK3_LEARN_SLIDES, strictMode: true,
-          tiers: LV7_QUIZ_CONFIGS.map((_, i) => () => buildLv7QuizProblem(lv7ShuffledConfigs[i])),
-          counts: LV7_QUIZ_CONFIGS.map(() => 1),
-          // 레벨테스트: 개념 슬라이드에서 직접 검증한 진짜 대각선 지그재그 축(코너 2점 +
-          // 도망 대각선 지지대 1점)을 그대로 실전 대국으로 재현한다. (5,4)부터 시작해 8번의
-          // 단수-도피가 대각선으로 번갈아 이어지고, 9번째 수(8,8)로 최종 포획한다 - 검증된
-          // 전체 수순: black(5,4)->white(4,5)->black(4,6)->white(5,5)->black(6,5)->white(5,6)
-          // ->black(5,7)->white(6,6)->black(7,6)->white(6,7)->black(6,8)->white(7,7)
-          // ->black(7,8)->white(8,7)->black(8,6)->black(8,8)[포획].
-          levelTest: {
-              black: [[3, 4], [4, 3], [3, 5]],
-              white: [[4, 4]],
-              desc: '이 백돌을 끝까지 몰아서 잡아보세요!',
-              moveLimit: 12
-          } },
+          learnSlides: ATARIATTACK3_LEARN_SLIDES,
+          // Lv.7부터는 "한 곳 클릭 -> 정답 확인 -> 해설" 퀴즈 대신, 10문제 전부를 레벨테스트와
+          // 똑같은 실전 미니게임으로 만든다 - 진짜 대각선 지그재그 축(코너 2점 + 도망 대각선
+          // 지지대 1점)을 실제로 끝까지 몰아서 잡아야 한 문제를 통과한다. 10개 전부 별도의
+          // both-branches 사다리 솔버로 완전 검증했다(각 위치가 실제로 9x9 판 안에서 끝까지
+          // 잡히는지, 최소 몇 수가 필요한지까지). 9문제 이상(90점) 잡아야 클리어.
+          miniTests: LV7_MINITEST_CONFIGS,
+          miniTestDesc: '이 백돌을 끝까지 몰아서 잡아보세요! 활로가 줄어드는 방향으로 계속 몰아가야 해요.' },
         { key: 'atariattack4', title: '[Lv. 8] 가장자리에 있는 돌 공격하기', sub: '가장자리에 있는 돌을 노려요',
           tiers: [
               () => {
@@ -3101,8 +3053,10 @@
                     <span class="topic-progress-text">${points}/${SCORE_MAX}점 (최고 기록)${remain}</span>`;
             }
 
-            let quizCount = (t.counts || [7, 7, 6]).reduce((a, b) => a + b, 0);
-            let modeNote = t.learnSlides ? `개념 배우기 + 퀴즈 ${quizCount}문제` : `랜덤 ${quizCount}문제`;
+            let quizCount = t.miniTests ? t.miniTests.length : (t.counts || [7, 7, 6]).reduce((a, b) => a + b, 0);
+            let modeNote = !t.learnSlides ? `랜덤 ${quizCount}문제`
+                : t.miniTests ? `개념 배우기 + 미니테스트 ${quizCount}문제`
+                : `개념 배우기 + 퀴즈 ${quizCount}문제`;
             btn.innerHTML = `
                 <div class="topic-top-row">
                     <span>${lockIcon}${t.title}</span>
@@ -3140,6 +3094,7 @@
     }
 
     function goHome() {
+        miniTestSeriesActive = false; // 미니테스트 시리즈 도중 홈으로 나가면 이어지던 시리즈 상태를 정리한다
         renderCharacterHeader();
         buildHomeScreen();
         switchScreen('screen-home');
@@ -3163,14 +3118,18 @@
             document.getElementById('topic-intro-title').innerText = topic.title;
             document.getElementById('topic-intro-sub').innerText = topic.sub;
             document.getElementById('topic-intro-leveltest-btn').style.display = topic.levelTest ? '' : 'none';
+            document.getElementById('topic-intro-quiz-btn').innerText = topic.miniTests ? '⚔️ 미니테스트 도전!' : '✏️ 퀴즈 풀기';
             switchScreen('screen-topic-intro');
         } else {
             beginTopicQuiz(topicKey);
         }
     }
 
-    // screen-topic-intro의 "퀴즈 풀기" 버튼용.
+    // screen-topic-intro의 "퀴즈 풀기"(또는 미니테스트) 버튼용 - Lv.7부터는 클릭식 퀴즈 대신
+    // 10문제 전부가 레벨테스트와 같은 실전 미니게임 시리즈다.
     function startIntroQuiz() {
+        const topic = TOPICS.find(t => t.key === currentTopicKey);
+        if (topic && topic.miniTests) { beginMiniTestQuiz(currentTopicKey); return; }
         beginTopicQuiz(currentTopicKey);
     }
 
@@ -3179,7 +3138,6 @@
         let topic = TOPICS.find(t => t.key === topicKey);
         if (topicKey === 'atariattack1') resetLv5QuizOrder(); // 매 시도마다 모양별 순서를 새로 섞는다
         if (topicKey === 'atariattack2') resetLv6QuizOrder();
-        if (topicKey === 'atariattack3') resetLv7QuizOrder();
         problemsList = generateTopicSet(topic.tiers, topic.counts);
         currentProblemIndex = 0;
         totalScore = 0;
@@ -3190,6 +3148,8 @@
     }
 
     function retryTopic() {
+        const topic = TOPICS.find(t => t.key === currentTopicKey);
+        if (topic && topic.miniTests) { beginMiniTestQuiz(currentTopicKey); return; }
         beginTopicQuiz(currentTopicKey);
     }
 
@@ -3640,7 +3600,7 @@
         document.getElementById('final-score').innerText = scaledScore;
         let topic = TOPICS.find(t => t.key === currentTopicKey);
         document.getElementById('result-topic-msg').innerText =
-            `"${topic.title}" 문제 ${problemsList.length}개를 모두 풀었어요!`;
+            `"${topic.title}" 문제 ${quizResults.length}개를 모두 풀었어요!`;
         renderQuizResultsTable();
         document.getElementById('result-leveltest-btn').style.display = topic.levelTest ? '' : 'none';
         const saveMsgEl = document.getElementById('result-save-msg');
@@ -3858,6 +3818,7 @@
 
     function startOfflineGame() {
         const nameInput = document.getElementById('opponent-name-input').value.trim();
+        miniTestSeriesActive = false;
         playMode = 'offline';
         playOpponentName = nameInput || '상대방';
         playAiDifficulty = null;
@@ -3867,6 +3828,7 @@
     }
 
     function startAiGame(difficulty) {
+        miniTestSeriesActive = false;
         playMode = 'ai';
         playAiDifficulty = difficulty;
         playOpponentName = '';
@@ -3886,6 +3848,7 @@
             alert(`먼저 퀴즈에서 ${CLEAR_THRESHOLD}점 이상을 받아야 레벨테스트에 도전할 수 있어요!`);
             return;
         }
+        miniTestSeriesActive = false;
         playMode = 'leveltest';
         playAiDifficulty = null;
         playOpponentName = '';
@@ -3896,6 +3859,37 @@
         levelTestMovesLeft = topic.levelTest.moveLimit;
         initPlayBoard();
         document.getElementById('play-message').innerText = topic.levelTest.desc || '';
+        switchScreen('screen-play-board');
+    }
+
+    // Lv.7부터: "퀴즈 풀기"가 곧 10개의 실전 레벨테스트 미니게임 시리즈다. 매번 순서를
+    // 새로 섞고, 하나씩 차례로 startLevelTest()와 똑같은 방식(playMode='leveltest')으로
+    // 실전 대국을 시켜서 잡으면 10점, 못 잡으면 0점을 quizResults/totalScore에 쌓는다 -
+    // 마지막 문제까지 끝나면 기존 퀴즈와 동일한 finishTopicQuiz/saveTopicResult로 마무리한다.
+    function beginMiniTestQuiz(topicKey) {
+        currentTopicKey = topicKey;
+        const topic = TOPICS.find(t => t.key === topicKey);
+        miniTestList = shuffle(topic.miniTests.slice());
+        miniTestIndex = 0;
+        totalScore = 0;
+        quizResults = [];
+        miniTestSeriesActive = true;
+        loadMiniTestRound();
+    }
+
+    function loadMiniTestRound() {
+        const topic = TOPICS.find(t => t.key === currentTopicKey);
+        const cfg = miniTestList[miniTestIndex];
+        playMode = 'leveltest';
+        playAiDifficulty = null;
+        playOpponentName = '';
+        resetPlayState();
+        cfg.black.forEach(([x, y]) => { playBoard[y][x] = 'black'; });
+        cfg.white.forEach(([x, y]) => { playBoard[y][x] = 'white'; });
+        levelTestTopicKey = topic.key;
+        levelTestMovesLeft = cfg.moveLimit;
+        initPlayBoard();
+        document.getElementById('play-message').innerText = topic.miniTestDesc || '';
         switchScreen('screen-play-board');
     }
 
@@ -3965,7 +3959,9 @@
         const label = playMode === 'ai'
             ? `🤖 AI (${AI_DIFFICULTY_LABEL[playAiDifficulty] || ''})`
             : playMode === 'leveltest'
-            ? `${GOBOARD_ICON_SVG} 레벨테스트 백돌 (남은 기회 ${levelTestMovesLeft}수)`
+            ? (miniTestSeriesActive
+                ? `${GOBOARD_ICON_SVG} 미니테스트 백돌 (문제 ${miniTestIndex + 1}/${miniTestList.length} · 남은 기회 ${levelTestMovesLeft}수)`
+                : `${GOBOARD_ICON_SVG} 레벨테스트 백돌 (남은 기회 ${levelTestMovesLeft}수)`)
             : `🧑‍🤝‍🧑 ${playOpponentName}`;
         opponentBar.innerHTML = `
             <div class="op-info">${label}</div>
@@ -4029,7 +4025,7 @@
 
         // 이번 수(흑/백 누구든)로 백이 확정된 눈(홑눈) 2개 이상을 갖추게 됐다면, 더 두지 않고
         // 바로 백의 방어 성공으로 끝낸다 - 백이 스스로 눈을 메우다 결국 잡히는 사고를 원천 차단한다.
-        if (playMode === 'leveltest' && levelTestSingleEyePoints(playBoard).length >= 2) { levelTestEndGame(false); return; }
+        if (playMode === 'leveltest' && levelTestSingleEyePoints(playBoard).length >= 2) { levelTestFinish(false); return; }
 
         if (playMode === 'ai' && playTurn === 'white') {
             setTimeout(aiTakeTurn, 450);
@@ -4037,8 +4033,8 @@
             // 방금 유저(흑)가 뒀다 - 이번 수까지 포함해서 남은 횟수를 센다.
             levelTestMovesLeft--;
             renderPlayBars(); // 상단의 "남은 기회" 표시를 갱신한다
-            if (countPlayBoardColor(playBoard, 'white') === 0) { levelTestEndGame(true); return; }
-            if (levelTestMovesLeft <= 0) { levelTestEndGame(false); return; }
+            if (countPlayBoardColor(playBoard, 'white') === 0) { levelTestFinish(true); return; }
+            if (levelTestMovesLeft <= 0) { levelTestFinish(false); return; }
             setTimeout(levelTestAiTakeTurn, 450);
         }
     }
@@ -4084,7 +4080,7 @@
         document.getElementById('play-message').innerText = isAiPass ? 'AI가 더 둘 만한 곳이 없어서 차례를 넘겼어요.' : '';
         renderPlayTurnIndicator();
         if (playConsecutivePasses >= 2) {
-            if (playMode === 'leveltest') { levelTestEndGame(countPlayBoardColor(playBoard, 'white') === 0); return; }
+            if (playMode === 'leveltest') { levelTestFinish(countPlayBoardColor(playBoard, 'white') === 0); return; }
             playEndGame();
             return;
         }
@@ -4093,14 +4089,15 @@
         } else if (playMode === 'leveltest' && playTurn === 'white') {
             levelTestMovesLeft--;
             renderPlayBars();
-            if (countPlayBoardColor(playBoard, 'white') === 0) { levelTestEndGame(true); return; }
-            if (levelTestMovesLeft <= 0) { levelTestEndGame(false); return; }
+            if (countPlayBoardColor(playBoard, 'white') === 0) { levelTestFinish(true); return; }
+            if (levelTestMovesLeft <= 0) { levelTestFinish(false); return; }
             setTimeout(levelTestAiTakeTurn, 450);
         }
     }
 
     function playEndGame() {
         playGameEnded = true;
+        resetPlayEndButtonsForFreeform();
         // 한국식 계가: 집 + 잡은 돌 수로 승부를 가른다 (판에 남은 돌 개수는 점수에 안 들어간다).
         const score = computeFinalScore(playBoard, playCapturedBy);
         score.territoryCells.forEach(({ x, y }) => {
@@ -4668,12 +4665,29 @@
         if (playGameEnded || playMode !== 'leveltest' || playTurn !== 'white') return;
         const koBoard = playHistory.length > 0 ? playHistory[playHistory.length - 1].board : null;
         const move = levelTestChooseWhiteMove(playBoard, koBoard);
-        if (!move) { levelTestEndGame(true); return; } // 더 둘 곳이 없다 = 도망갈 수 없으니 사실상 유저 승리
+        if (!move) { levelTestFinish(true); return; } // 더 둘 곳이 없다 = 도망갈 수 없으니 사실상 유저 승리
         attemptPlayMove(move.x, move.y);
+    }
+
+    // 'leveltest' 모드의 대국 종료 지점은 전부 이 함수를 거친다 - 단발성 레벨테스트(Lv.5/6)면
+    // 기존 levelTestEndGame 동작 그대로, Lv.7처럼 10개짜리 미니테스트 시리즈 도중이면
+    // miniTestRoundEnd로 넘겨서 "다음 문제로 이어지는" 다른 흐름을 탄다.
+    function levelTestFinish(won) {
+        if (miniTestSeriesActive) { miniTestRoundEnd(won); return; }
+        levelTestEndGame(won);
+    }
+
+    // 팝업의 "새 대국"/"확인" 버튼은 자유 대국·단발성 레벨테스트용, "다음 문제 보기" 버튼은
+    // 미니테스트 시리즈 전용이다 - 팝업을 띄우기 전에 항상 이 상태로 되돌려 놓는다.
+    function resetPlayEndButtonsForFreeform() {
+        document.getElementById('play-end-restart-btn').style.display = '';
+        document.getElementById('play-end-confirm-btn').style.display = '';
+        document.getElementById('play-end-continue-btn').style.display = 'none';
     }
 
     function levelTestEndGame(won) {
         playGameEnded = true;
+        resetPlayEndButtonsForFreeform();
         if (won) {
             const character = getActiveCharacter();
             if (character) {
@@ -4688,6 +4702,34 @@
             : `<div class="modal-winner-row">😢 백돌이 활로를 찾아 살아남았어요.</div>
                <div class="modal-score-row">다시 도전해보세요!</div>`;
         document.getElementById('play-end-popup').classList.add('active');
+    }
+
+    // 미니테스트 시리즈(Lv.7) 한 문제가 끝났을 때 - levelTestsWon 플래그 대신 quizResults/
+    // totalScore에 채점하고, 마지막 문제가 아니면 "다음 문제 보기" 버튼만 남긴다.
+    function miniTestRoundEnd(won) {
+        playGameEnded = true;
+        quizResults.push({ correct: won });
+        if (won) totalScore += 10;
+        document.getElementById('play-end-restart-btn').style.display = 'none';
+        document.getElementById('play-end-confirm-btn').style.display = 'none';
+        const continueBtn = document.getElementById('play-end-continue-btn');
+        continueBtn.style.display = '';
+        continueBtn.innerText = miniTestIndex >= miniTestList.length - 1 ? '결과 확인하기 ▶' : '다음 문제 보기 ▶';
+        document.getElementById('play-end-summary').innerHTML = won
+            ? `<div class="modal-winner-row">🎉 백돌을 잡았어요!</div>`
+            : `<div class="modal-winner-row">😢 백돌이 활로를 찾아 살아남았어요.</div>`;
+        document.getElementById('play-end-popup').classList.add('active');
+    }
+
+    function miniTestAdvance() {
+        closePlayEndPopup();
+        miniTestIndex++;
+        if (miniTestIndex >= miniTestList.length) {
+            miniTestSeriesActive = false;
+            finishTopicQuiz(miniTestList.length * 10);
+        } else {
+            loadMiniTestRound();
+        }
     }
 
     buildHomeScreen();
