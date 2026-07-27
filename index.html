@@ -2958,6 +2958,19 @@
     // 직접 계산하는 스크립트로 검증했다 - 가운데만 유일하게 2개의 분리된 참 눈을 만든다).
     const VITALPOINT_WALL = [{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:4,y:1},{x:5,y:1},{x:1,y:2},{x:5,y:2},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:4,y:3},{x:5,y:3}];
     const VITALPOINT_WHITE = [{x:0,y:1},{x:1,y:0},{x:2,y:0},{x:3,y:0},{x:4,y:0},{x:6,y:1},{x:5,y:0},{x:0,y:2},{x:6,y:2},{x:0,y:3},{x:1,y:4},{x:2,y:4},{x:3,y:4},{x:4,y:4},{x:6,y:3},{x:5,y:4}];
+    // 집 개념 비교 예시 3종 - 사용자가 제공한 참고 사진 3장과 똑같은 배치(구석에 붙은 5칸 폭 벽,
+    // 위쪽 줄의 빈 자리 위치/개수만 다름)를 그대로 재현했다: A=빈칸 2개가 서로 안 붙어있음(분리된
+    // 참눈 2개=무조건 삶), B=빈칸 2개가 나란히 붙어있음(연결된 집 1개=결국 죽음), C=빈칸 1개뿐
+    // (이미 활로 1개=단수, 즉시 죽음). 셋 다 실제 엔진(getGroupAndLiberties/tryPlayMove)으로
+    // 직접 검증했다: A는 백이 두 빈칸 중 어디에 둬도 자충수(suicide)라 착수 자체가 반칙 처리되고,
+    // B는 백이 한 칸에 뛰어들면(합법) 흑이 남은 칸으로 따내지만 그 순간 흑 활로가 1개로 줄어(자충수와
+    // 같은 원리) 백이 그 마지막 자리를 두면 무리 전체가 잡히는 것까지 한 수 한 수 재현해서 확인했다.
+    const EXAMPLE_A_BLACK = [{x:1,y:0},{x:3,y:0},{x:0,y:1},{x:1,y:1},{x:2,y:1},{x:3,y:1}];
+    const EXAMPLE_A_WHITE = [{x:4,y:0},{x:4,y:1},{x:0,y:2},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:4,y:2}];
+    const EXAMPLE_B_BLACK = [{x:2,y:0},{x:3,y:0},{x:0,y:1},{x:1,y:1},{x:2,y:1},{x:3,y:1}];
+    const EXAMPLE_B_WHITE = [{x:4,y:0},{x:4,y:1},{x:0,y:2},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:4,y:2}];
+    const EXAMPLE_C_BLACK = [{x:1,y:0},{x:2,y:0},{x:3,y:0},{x:0,y:1},{x:1,y:1},{x:2,y:1},{x:3,y:1}];
+    const EXAMPLE_C_WHITE = [{x:4,y:0},{x:4,y:1},{x:0,y:2},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:4,y:2}];
     const LV9_LEARN_SLIDES = [
         {
             title: '① 자충수란 무엇일까요?',
@@ -2990,31 +3003,84 @@
             lastMove: {x:0,y:3}, highlights: [{x:0,y:0},{x:1,y:3},{x:0,y:4}]
         },
         {
-            title: '⑥ 이번엔 완전히 다른 이야기예요',
-            desc: '이 흑돌은 백에게 완전히 둘러싸여서 더 이상 도망갈 곳이 없어요. 남은 건 이 안쪽 빈 자리 3칸뿐이에요. 이제부터는 활로가 아니라 "집"이 몇 개인지가 중요해요!',
+            title: '⑥ 완전히 둘러싸인 흑, 살까요 죽을까요?',
+            desc: '이 흑돌은 백에게 완전히 둘러싸여서 더 이상 도망갈 곳이 없어요. 남은 건 안쪽 빈 자리뿐이에요. 잘 보면 빈 자리 두 곳이 서로 뚝 떨어져 있어요!',
+            blackStones: EXAMPLE_A_BLACK, whiteStones: EXAMPLE_A_WHITE,
+            highlights: [{x:0,y:0},{x:2,y:0}]
+        },
+        {
+            title: '⑦ 정답: 삽니다! 집이 2개라서요',
+            desc: '따로 떨어진 빈 자리 하나하나를 "집"이라고 해요. 이 흑은 서로 안 붙어있는 집이 2개예요. 백이 이 자리에 돌을 두면 사방이 전부 흑이라 놓자마자 활로가 0개가 되는 반칙수라서 백은 아예 둘 수조차 없어요. 그래서 집이 2개면 백은 절대로 이 흑을 잡을 수 없어요!',
+            blackStones: EXAMPLE_A_BLACK, whiteStones: EXAMPLE_A_WHITE,
+            highlights: [{x:0,y:0},{x:2,y:0}]
+        },
+        {
+            title: '⑧ 그럼 이건 어떨까요?',
+            desc: '이번에도 빈 자리가 2칸이에요. 그런데 이번엔 서로 나란히 붙어있어요. 이것도 아까처럼 집이 2개일까요?',
+            blackStones: EXAMPLE_B_BLACK, whiteStones: EXAMPLE_B_WHITE,
+            highlights: [{x:0,y:0},{x:1,y:0}]
+        },
+        {
+            title: '⑨ 아니에요, 붙어있으면 집은 1개예요',
+            desc: '빈 자리끼리 붙어 있으면 따로 떨어진 게 아니라서 그냥 큰 집 1개예요(2칸짜리 집 1개). 집이 1개면 지금 당장은 안전해 보여도 결국 잡힐 수 있어요 - 백이 어떻게 잡는지 순서대로 보여줄게요.',
+            blackStones: EXAMPLE_B_BLACK, whiteStones: EXAMPLE_B_WHITE,
+            highlights: [{x:0,y:0},{x:1,y:0}]
+        },
+        {
+            title: '⑩ 백이 집 안으로 슬쩍 들어와요',
+            desc: '백이 집 안에 돌을 하나 놓아요. 당장 흑에게 잡힐 것 같아 보이지만, 사실 이게 흑을 죽이는 첫 수예요.',
+            blackStones: EXAMPLE_B_BLACK, whiteStones: [...EXAMPLE_B_WHITE, {x:0,y:0}],
+            lastMove: {x:0,y:0}
+        },
+        {
+            title: '⑪ 흑이 따내지만 활로가 1개로 줄어요',
+            desc: '흑이 남은 자리를 막아서 방금 들어온 백돌을 따냈어요. 그런데 그러면서 흑 스스로도 활로가 1개로 줄어버려요 - 앞에서 배운 자충수와 똑같은 원리예요!',
+            blackStones: [...EXAMPLE_B_BLACK, {x:1,y:0}], whiteStones: EXAMPLE_B_WHITE,
+            lastMove: {x:1,y:0}, highlights: [{x:0,y:0}]
+        },
+        {
+            title: '⑫ 결국 백에게 다 잡혀요',
+            desc: '백이 마지막 남은 자리를 두면 흑돌 전체가 통째로 잡혀요. 집이 1개뿐이면 이렇게 시간이 걸려도 결국은 잡혀요.',
+            blackStones: [], whiteStones: [...EXAMPLE_B_WHITE, {x:0,y:0}],
+            xmarks: [...EXAMPLE_B_BLACK, {x:1,y:0}], lastMove: {x:0,y:0}
+        },
+        {
+            title: '⑬ 더 위험한 경우 - 빈 자리가 1칸뿐',
+            desc: '이번엔 처음부터 빈 자리가 딱 1칸이에요. 집이 1개인 정도가 아니라, 이미 활로 자체가 1개라 지금 바로 단수예요.',
+            blackStones: EXAMPLE_C_BLACK, whiteStones: EXAMPLE_C_WHITE,
+            highlights: [{x:0,y:0}]
+        },
+        {
+            title: '⑭ 바로 잡혀요',
+            desc: '백이 다음 수에 그 자리를 두면 흑이 집을 나눌 틈도 없이 바로 잡혀요.',
+            blackStones: [], whiteStones: [...EXAMPLE_C_WHITE, {x:0,y:0}],
+            xmarks: EXAMPLE_C_BLACK, lastMove: {x:0,y:0}
+        },
+        {
+            title: '⑮ 살아남는 전략',
+            desc: '정리해볼게요: 완전히 둘러싸인 흑이 살아남으려면, 남은 빈 자리를 서로 뚝 떨어진 집 2개로 나눠야 해요. 빈 자리가 붙어있으면 아무리 넓어도 집은 1개뿐이라 결국 잡혀요. 그래서 정확히 나누는 자리(급소)를 먼저 찾는 게 중요해요!',
+            blackStones: VITALPOINT_WALL, whiteStones: VITALPOINT_WHITE
+        },
+        {
+            title: '⑯ 이제 직접 찾아볼까요?',
+            desc: '이 흑도 완전히 둘러싸였고 빈 자리가 3칸이에요. 어디를 막아야 집이 2개로 나뉠까요?',
             blackStones: VITALPOINT_WALL, whiteStones: VITALPOINT_WHITE,
             highlights: [{x:2,y:2},{x:3,y:2},{x:4,y:2}]
         },
         {
-            title: '⑦ 집이 2개면 절대 안 잡혀요!',
-            desc: '바둑의 아주 중요한 규칙이에요: 집을 2개로 나누면 백은 절대로 잡을 수 없어요. 반대로 집을 2개로 못 나누면 결국 잡아먹혀요! 지금은 3칸이 하나로 붙어있는 집 1개뿐이라 아직 위험해요.',
-            blackStones: VITALPOINT_WALL, whiteStones: VITALPOINT_WHITE,
-            highlights: [{x:2,y:2},{x:3,y:2},{x:4,y:2}]
-        },
-        {
-            title: '⑧ 가운데(급소)를 막아보세요',
+            title: '⑰ 가운데(급소)를 막아보세요',
             desc: '3칸의 정가운데를 흑이 먼저 두면 어떻게 될까요?',
             blackStones: [...VITALPOINT_WALL, {x:3,y:2}], whiteStones: VITALPOINT_WHITE,
             lastMove: {x:3,y:2}, highlights: [{x:2,y:2},{x:4,y:2}]
         },
         {
-            title: '⑨ 집이 2개! 이제 절대 안 잡혀요',
+            title: '⑱ 집이 2개! 이제 절대 안 잡혀요',
             desc: '가운데를 막으니 남은 2칸이 각각 따로 떨어진 집이 됐어요! 집을 2개로 나눴으니 백은 이 흑돌을 절대로 잡을 수 없어요 - 영원히 살아있어요.',
             blackStones: [...VITALPOINT_WALL, {x:3,y:2}], whiteStones: VITALPOINT_WHITE,
             highlights: [{x:2,y:2},{x:4,y:2}]
         },
         {
-            title: '⑩ 만약 다른 곳을 뒀다면?',
+            title: '⑲ 만약 다른 곳을 뒀다면?',
             desc: '가운데 대신 끝을 막았다면 남은 2칸이 아직 서로 붙어있는 집 1개예요. 집을 2개로 나누지 못했으니, 나중에 백이 이 집을 전부 메워서 흑돌을 잡아먹을 수 있어요. 그래서 처음부터 급소(가운데)를 찾아 집을 2개로 나누는 게 중요해요!',
             blackStones: [...VITALPOINT_WALL, {x:2,y:2}], whiteStones: VITALPOINT_WHITE,
             lastMove: {x:2,y:2}, highlights: [{x:3,y:2},{x:4,y:2}]
