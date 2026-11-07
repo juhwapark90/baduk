@@ -151,19 +151,16 @@
             display: inline-block; font-size: 11px; font-weight: bold; white-space: nowrap; margin-left: 6px;
             background: rgba(255,255,255,0.28); padding: 2px 8px; border-radius: 10px;
         }
-        /* 클리어 도장 - 작은 배지 대신, 도장을 쾅 찍은 것처럼 카드 오른쪽에 크게 비스듬히
-           겹쳐 보이도록 한다(눈에 안 띈다는 피드백 반영). 잉크가 살짝 번진 느낌을 주려고
-           이중 테두리(box-shadow inset + border)를 겹치고, 세리프 서체로 UI 폰트와 질감을
-           다르게 해서 "도장 느낌"을 살렸다. 카드 모서리 밖으로 살짝 삐져나가게 배치한 뒤
-           .topic-btn의 overflow:hidden으로 둥근 모서리에 맞춰 자연스럽게 잘리게 한다. */
+        /* 카드 내용 위에 가로 전체 너비로 겹치는 반투명 클리어 도장. */
         .clear-stamp {
-            position: absolute; top: -2px; right: -10px; transform: rotate(-9deg);
-            display: inline-flex; align-items: center; gap: 3px;
-            font-family: Georgia, 'Times New Roman', serif; font-weight: 900; font-size: 14px;
-            letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
-            color: rgba(198, 40, 40, 0.92); background: rgba(255,255,255,0.1);
-            border: 2.5px solid rgba(198, 40, 40, 0.92); border-radius: 7px; padding: 2px 10px 2px 9px;
-            box-shadow: inset 0 0 0 1.5px rgba(198,40,40,0.32);
+            position: absolute; top: 50%; left: 0; transform: translateY(-50%);
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 100%; min-height: 56px; box-sizing: border-box; opacity: 0.4;
+            font-family: inherit; font-weight: 900; font-size: clamp(30px, 8vw, 44px); line-height: 1.2;
+            letter-spacing: 0.12em; white-space: nowrap;
+            color: #fff; background: #b71c1c;
+            border: 3px solid #fff; border-radius: 9px; padding: 7px 4px;
+            box-shadow: 0 3px 7px rgba(90, 15, 15, 0.3), inset 0 0 0 2px #e57373;
             pointer-events: none; z-index: 2;
         }
         /* 캐릭터 레벨 강조 배지 - 동기부여 포인트라 눈에 띄게 금색으로 표시한다 */
